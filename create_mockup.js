@@ -165,16 +165,14 @@ async function addDisplacement(params) {
 }
 
 async function addHighlights(params) {
-  const { artwork, lightingMap, out, mode = 'hardlight' } = params;
-  // const highlight = `convert ${artwork} \( -clone 0 ${lightingMap} -compose ${mode} -composite \) +swap -compose CopyOpacity -composite ${out}`;
-  const highlight = `convert ${artwork} \\( -clone 0 ${lightingMap} -compose ${mode} -composite \\) +swap -compose CopyOpacity -composite ${out}`;
+  const { artwork, lightingMap, out, mode = 'hardlight', strength = 40 } = params;
+  const highlight = `convert ${artwork} ${lightingMap} -compose ${mode} -define compose:args=${strength} -composite ${out}`;
   await execShellCommand(highlight);
 }
 
 async function adjustColors(params) {
-  const { artwork, adjustmentMap, out } = params;
-  // const adjust = `convert ${artwork} \( -clone 0 ${adjustmentMap} -compose multiply -composite \) +swap -compose CopyOpacity -composite ${out}`;
-  const adjust = `convert ${artwork} \\( -clone 0 ${adjustmentMap} -compose multiply -composite \\) +swap -compose CopyOpacity -composite ${out}`;
+  const { artwork, adjustmentMap, out, strength = 30, mode = 'multiply' } = params;
+  const adjust = `convert ${artwork} ${adjustmentMap} -compose ${mode} -define compose:args=${strength} -composite ${out}`;
   await execShellCommand(adjust);
 }
 
@@ -196,7 +194,7 @@ async function generateMockup(params) {
     await perspectiveTransform({ template, artwork: tmp2, mask, out: tmp2, useOriginalCoords, isTiled: true });
     fs.unlinkSync(tmp);
   } else {
-    await addBorder({ artwork, out: tmp });
+  await addBorder({ artwork, out: tmp });
     await perspectiveTransform({ template, artwork: tmp, mask, out: tmp, useOriginalCoords, isTiled: false });
   }
   
@@ -245,28 +243,204 @@ function getNextOutputFile() {
   return path.join(mockupDir, filename);
 }
 
-// Command line argument parsing
-const args = process.argv.slice(2);
-const useDynamic = args.includes('--dynamic') || args.includes('-d');
-const disableTiling = args.includes('--no-tile') || args.includes('--single');
-const useTiling = !disableTiling; // Tiling is now DEFAULT, use --no-tile to disable
-const artworkArg = args.find(arg => arg.startsWith('--artwork=')) || args.find(arg => arg.startsWith('-a='));
-const artworkFile = artworkArg ? artworkArg.split('=')[1] : "swatches/art6.jpg";
-
-console.log(`Using ${useDynamic ? 'dynamic' : 'original'} coordinates`);
-console.log(`Tiling: ${useTiling ? 'enabled (DEFAULT)' : 'disabled'}`);
-console.log(`Artwork: ${artworkFile}`);
-
-const mockups = {
-  'out': getNextOutputFile(),
-  'artwork': artworkFile,
-  'template': 'base_images/template.jpg',
-  'mask': 'base_images/mask.png',
-  'displacementMap': 'maps/displacement_map.png',
-  'lightingMap': 'maps/lighting_map.png',
-  'adjustmentMap': 'maps/adjustment_map.jpg',
-  'useOriginalCoords': !useDynamic,  // Use original coordinates unless --dynamic flag is set
-  'useTiling': useTiling  // Tiling is now DEFAULT
+/**
+ * Generate mockup for specific product with custom artwork
+ * @param {string} productName - Name of the product (e.g., 'tshirt', 'mug', 'curtain')
+ * @param {string} artworkFile - Path to artwork file
+ * @param {Object} options - Additional options
+ * @returns {Promise<string>} - Path to generated mockup file
+ */
+async function generateProductMockup(productName, artworkFile, options = {}) {
+    const {
+        useDynamic = false,
+        useTiling = true,
+        outputDir = `mockups/${productName}`
+    } = options;
+    
+    // Validate product exists
+    const baseDir = `base_images/${productName}`;
+    const mapsDir = `maps/${productName}`;
+    
+    if (!fs.existsSync(baseDir)) {
+        throw new Error(`Product '${productName}' not found in base_images/`);
+    }
+    
+    if (!fs.existsSync(mapsDir)) {
+        throw new Error(`Maps for '${productName}' not found. Run ./create_maps.sh ${productName} first.`);
+    }
+    
+    // Check if required files exist
+    const templatePath = `${baseDir}/template.jpg`;
+    const maskPath = `${baseDir}/mask.png`;
+    const displacementPath = `${mapsDir}/displacement_map.png`;
+    const lightingPath = `${mapsDir}/lighting_map.png`;
+    const adjustmentPath = `${mapsDir}/adjustment_map.jpg`;
+    
+    if (!fs.existsSync(templatePath)) {
+        throw new Error(`Template image not found: ${templatePath}`);
+    }
+    if (!fs.existsSync(maskPath)) {
+        throw new Error(`Mask image not found: ${maskPath}`);
+    }
+    if (!fs.existsSync(displacementPath)) {
+        throw new Error(`Displacement map not found: ${displacementPath}`);
+    }
+    if (!fs.existsSync(lightingPath)) {
+        throw new Error(`Lighting map not found: ${lightingPath}`);
+    }
+    if (!fs.existsSync(adjustmentPath)) {
+        throw new Error(`Adjustment map not found: ${adjustmentPath}`);
+    }
+    
+    // Create output directory
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+    }
+    
+    // Get next output file for this product
+    const outputFile = getNextOutputFileForProduct(productName);
+    
+    const mockupParams = {
+        'out': outputFile,
+        'artwork': artworkFile,
+        'template': templatePath,
+        'mask': maskPath,
+        'displacementMap': displacementPath,
+        'lightingMap': lightingPath,
+        'adjustmentMap': adjustmentPath,
+        'useOriginalCoords': !useDynamic,
+        'useTiling': useTiling
+    };
+    
+    console.log(`Generating mockup for ${productName} with artwork ${artworkFile}`);
+    console.log(`Output: ${outputFile}`);
+    
+    await generateMockup(mockupParams);
+    return outputFile;
 }
 
-generateMockup(mockups)
+/**
+ * Get next available output filename for specific product
+ * @param {string} productName - Name of the product
+ * @returns {string} - Path to next output file
+ */
+function getNextOutputFileForProduct(productName) {
+    const mockupDir = path.join(process.cwd(), "mockups", productName);
+    
+    if (!fs.existsSync(mockupDir)) {
+        fs.mkdirSync(mockupDir, { recursive: true });
+    }
+    
+    const files = fs.readdirSync(mockupDir);
+    let index = 0;
+    let filename = "output.jpg";
+    
+    while (files.includes(filename)) {
+        index++;
+        filename = `output${index}.jpg`;
+    }
+    
+    return path.join(mockupDir, filename);
+}
+
+/**
+ * List available products
+ * @returns {Array<string>} - Array of available product names
+ */
+function listAvailableProducts() {
+    const baseDir = path.join(process.cwd(), "base_images");
+    
+    if (!fs.existsSync(baseDir)) {
+        console.log("No base_images directory found");
+        return [];
+    }
+    
+    const products = fs.readdirSync(baseDir)
+        .filter(item => fs.statSync(path.join(baseDir, item)).isDirectory())
+        .filter(product => {
+            const templatePath = path.join(baseDir, product, "template.jpg");
+            const maskPath = path.join(baseDir, product, "mask.png");
+            return fs.existsSync(templatePath) && fs.existsSync(maskPath);
+        });
+    
+    return products;
+}
+
+/**
+ * Check if product has all required files
+ * @param {string} productName - Name of the product
+ * @returns {Object} - Status object with hasBaseImages, hasMaps, isReady
+ */
+function checkProductStatus(productName) {
+    const baseDir = `base_images/${productName}`;
+    const mapsDir = `maps/${productName}`;
+    
+    const hasBaseImages = fs.existsSync(`${baseDir}/template.jpg`) && fs.existsSync(`${baseDir}/mask.png`);
+    const hasMaps = fs.existsSync(`${mapsDir}/displacement_map.png`) && 
+                   fs.existsSync(`${mapsDir}/lighting_map.png`) && 
+                   fs.existsSync(`${mapsDir}/adjustment_map.jpg`);
+    
+    return {
+        hasBaseImages,
+        hasMaps,
+        isReady: hasBaseImages && hasMaps
+    };
+}
+
+// Export the main function as default
+export default generateProductMockup;
+
+// Export other useful functions
+export {
+    listAvailableProducts,
+    checkProductStatus,
+    getNextOutputFileForProduct
+};
+
+// CLI functionality (only runs if called directly)
+if (import.meta.url === `file://${process.argv[1]}`) {
+    const args = process.argv.slice(2);
+    
+    if (args.includes('--list-products')) {
+        const products = listAvailableProducts();
+        console.log('Available products:');
+        products.forEach(product => {
+            const status = checkProductStatus(product);
+            const statusText = status.isReady ? '✅ Ready' : 
+                             status.hasBaseImages ? '⚠️  Missing maps' : '❌ Missing base images';
+            console.log(`  - ${product} (${statusText})`);
+        });
+        process.exit(0);
+    }
+    
+    const productArg = args.find(arg => arg.startsWith('--product=')) || args.find(arg => arg.startsWith('-p='));
+    const productName = productArg ? productArg.split('=')[1] : null;
+    
+    if (!productName) {
+        console.log('Usage: node create_mockup.js --product=PRODUCT_NAME --artwork=ARTWORK_FILE');
+        console.log('       node create_mockup.js --list-products');
+        process.exit(1);
+    }
+    
+    const useDynamic = args.includes('--dynamic') || args.includes('-d');
+    const disableTiling = args.includes('--no-tile') || args.includes('--single');
+    const useTiling = !disableTiling;
+    const artworkArg = args.find(arg => arg.startsWith('--artwork=')) || args.find(arg => arg.startsWith('-a='));
+    const artworkFile = artworkArg ? artworkArg.split('=')[1] : "swatches/art9.jpg";
+    
+    console.log(`Product: ${productName}`);
+    console.log(`Using ${useDynamic ? 'dynamic' : 'original'} coordinates`);
+    console.log(`Tiling: ${useTiling ? 'enabled (DEFAULT)' : 'disabled'}`);
+    console.log(`Artwork: ${artworkFile}`);
+    
+    // Generate mockup for specific product
+    generateProductMockup(productName, artworkFile, {
+        useDynamic,
+        useTiling
+    }).then(outputFile => {
+        console.log(`Mockup generated: ${outputFile}`);
+    }).catch(error => {
+        console.error('Error generating mockup:', error.message);
+        process.exit(1);
+    });
+}
