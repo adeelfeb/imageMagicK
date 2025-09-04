@@ -213,6 +213,9 @@ mockups/*
 !mockups/output42.jpg
 !mockups/output43.jpg
 !mockups/output44.jpg
+!mockups/mobile_cover/output15.jpg
+!mockups/mobile_cover/output16.jpg
+!mockups/mobile_cover/output17.jpg
 
 # OS generated files
 .DS_Store

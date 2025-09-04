@@ -59,7 +59,10 @@ async function analyzeMaskArea(maskPath) {
       let offsetY = offset ? parseInt(offset[2]) : 0;
       
       // If the detected area is too large, scale it down to a reasonable size
-      const maxSize = 800; // Maximum reasonable size for artwork area
+      // But don't scale down small areas (like mobile covers) - they should stay their natural size
+      const maxSize = 1200; // Increased max size to accommodate larger products
+      const minSize = 200;  // Minimum size to avoid over-scaling small areas
+      
       if (width > maxSize || height > maxSize) {
         const scale = Math.min(maxSize / width, maxSize / height);
         width = Math.floor(width * scale);
@@ -67,6 +70,16 @@ async function analyzeMaskArea(maskPath) {
         // Re-center the offset
         offsetX = Math.floor((templateSize - width) / 2);
         offsetY = Math.floor((templateSize - height) / 2);
+      } else if (width < minSize || height < minSize) {
+        // For small areas, ensure they're not too tiny but don't over-scale
+        const scale = Math.max(minSize / width, minSize / height);
+        if (scale > 1.5) { // Only scale if significantly too small
+          width = Math.floor(width * Math.min(scale, 1.5));
+          height = Math.floor(height * Math.min(scale, 1.5));
+          // Re-center the offset
+          offsetX = Math.floor((templateSize - width) / 2);
+          offsetY = Math.floor((templateSize - height) / 2);
+        }
       }
       
       console.log(`Detected mask area: ${width}x${height} at (${offsetX}, ${offsetY})`);
@@ -120,10 +133,24 @@ async function perspectiveTransform(params) {
       
       coordinates = [...srcCoords, ...dstCoords].join(',');
     } else {
-      // Use coordinates adapted for 612x612 artwork
-      console.log('Using coordinates adapted for 612x612 artwork');
-      // Source: 612x612 artwork, Destination: mask area with perspective
-      coordinates = [0,0,612,0,0,612,612,612,1500,3000,1700,4000,1500,0,1700,0].join(',');
+      // Use coordinates adapted for single artwork - scale to fit mask area
+      console.log('Using coordinates adapted for single artwork');
+      const maskArea = await analyzeMaskArea(mask);
+      console.log('Mask area for single artwork:', maskArea);
+      
+      // Source coordinates (artwork corners)
+      const srcCoords = [0, 0, artworkWidth, 0, 0, artworkHeight, artworkWidth, artworkHeight];
+      
+      // Destination coordinates (mask area with perspective)
+      const perspectiveOffset = Math.min(50, maskArea.width * 0.1); // Scale perspective offset to mask size
+      const dstCoords = [
+        maskArea.offsetX, maskArea.offsetY,                                    // top-left
+        maskArea.offsetX + maskArea.width, maskArea.offsetY,                   // top-right  
+        maskArea.offsetX + perspectiveOffset, maskArea.offsetY + maskArea.height,     // bottom-left (with perspective)
+        maskArea.offsetX + maskArea.width - perspectiveOffset, maskArea.offsetY + maskArea.height  // bottom-right (with perspective)
+      ];
+      
+      coordinates = [...srcCoords, ...dstCoords].join(',');
     }
   } else {
     // Analyze the mask to get the actual area where artwork should be placed

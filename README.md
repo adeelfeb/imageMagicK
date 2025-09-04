@@ -156,6 +156,44 @@ Tiling is the default behavior! If you want just one copy of your pattern, use:
 node create_mockup.js --no-tile --artwork=swatches/your-pattern.jpg
 ```
 
+## **📱 Mobile Cover Support**
+
+The tool now supports multiple product types including mobile phone covers! Each product has its own optimized settings:
+
+### **Available Products:**
+- **Curtain** - Large surface area (tiling recommended)
+- **T-shirt** - Medium surface area (tiling recommended) 
+- **Mobile Cover** - Small surface area (single placement or tiling)
+- **Mug** - Medium surface area (tiling recommended)
+- **Hoodie** - Large surface area (tiling recommended)
+
+### **Mobile Cover Specifications:**
+- **Template Size**: 406x609 pixels
+- **Mask Area**: Optimized for phone case dimensions
+- **Pattern Size**: For best results, use patterns sized to match the mask area (approximately 400x600 pixels)
+
+### **Mobile Cover Examples:**
+
+![Mobile Cover Example 1](mockups/mobile_cover/output15.jpg)
+*Mobile cover with tiled pattern*
+
+![Mobile Cover Example 2](mockups/mobile_cover/output16.jpg)
+*Mobile cover with single artwork placement*
+
+![Mobile Cover Example 3](mockups/mobile_cover/output17.jpg)
+*Mobile cover with different pattern*
+
+### **Pattern Size Guidelines:**
+- **Large products** (curtain, hoodie): Use any size pattern - tiling will cover the surface
+- **Medium products** (tshirt, mug): Use patterns 300x300 to 600x600 pixels
+- **Small products** (mobile cover): Use patterns 400x600 pixels for optimal fit
+
+### **Smart Scaling:**
+The tool automatically detects mask dimensions and scales your artwork accordingly:
+- Small masks get proportionally scaled artwork
+- Large masks get tiled patterns for full coverage
+- Perspective effects adjust based on product size
+
 ## **🎉 That's It!**
 
 You're all set! The tool will automatically tile your patterns across the entire surface of your product mockup. Just run `node create_mockup.js` and watch the magic happen! ✨
