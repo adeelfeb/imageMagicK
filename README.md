@@ -78,32 +78,50 @@ Now the fun part! Here's how to use it:
 
 ### **Basic Usage (Recommended):**
 ```bash
-# Create a mockup with the default pattern - it will automatically tile across the whole surface!
 node create_mockup.js
-
-# Use your own pattern
 node create_mockup.js --artwork=swatches/your-pattern.jpg
 ```
 
+**What these commands do:**
+- First command creates a mockup with the default pattern - it will automatically tile across the whole surface!
+- Second command uses your own pattern
+
 ### **Other Options:**
 ```bash
-# Try different patterns
 node create_mockup.js --artwork=swatches/floral-design.jpg
 node create_mockup.js --artwork=swatches/geometric-pattern.png
-
-# Use dynamic positioning (experimental)
 node create_mockup.js --dynamic --artwork=swatches/your-pattern.jpg
-
-# Place just one copy of your pattern (no tiling)
 node create_mockup.js --no-tile --artwork=swatches/your-pattern.jpg
 ```
+
+**What these options do:**
+- Try different patterns with various artwork files
+- Use dynamic positioning (experimental feature)
+- Place just one copy of your pattern (no tiling)
 
 ## **📂 What You'll Get**
 
 Your generated mockups will appear in the `mockups/` folder:
-- `output.jpg` - Your first mockup
-- `output1.jpg` - Your second mockup
-- `output2.jpg` - And so on...
+- `output41.jpg` - Your first mockup
+- `output42.jpg` - Your second mockup
+- `output43.jpg` - And so on...
+
+## **🎨 Example Results**
+
+Here are some sample mockups created with this tool to show you what to expect:
+
+### **Sample Outputs:**
+
+![Mockup Example 1](mockups/output41.jpg)
+*output41.jpg - Tiled pattern covering entire surface*
+
+![Mockup Example 2](mockups/output40.jpg)
+*output40.jpg - Different artwork with automatic tiling*
+
+![Mockup Example 3](mockups/output43.jpg)
+*output43.jpg - Pattern variation showing full coverage*
+
+*These examples show how the tool automatically tiles your patterns across the entire surface of your product mockup, creating professional-looking results!*
 
 ## **💡 Pro Tips**
 

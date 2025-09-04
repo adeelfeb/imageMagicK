@@ -199,13 +199,20 @@ dist
 .pnp.*
 
 # Project specific
-mockups/
 maps/
 mpcs/
 tiled_images/
 *.mpc
 *.cache
 mask_processed.png
+
+# Keep some sample mockups but ignore most
+mockups/*
+!mockups/output40.jpg
+!mockups/output41.jpg
+!mockups/output42.jpg
+!mockups/output43.jpg
+!mockups/output44.jpg
 
 # OS generated files
 .DS_Store
