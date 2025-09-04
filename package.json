@@ -1,0 +1,17 @@
+{
+  "name": "mockup",
+  "version": "1.0.0",
+  "description": "**I think you should read my blog post regarding this, [click here](https://ifkash.hashnode.dev/imagemagick-product-mockups)**",
+  "main": "create_mockup.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "jimp": "^0.22.12",
+    "sharp": "^0.34.3"
+  }
+}
