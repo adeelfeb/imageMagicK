@@ -101,25 +101,38 @@ node create_mockup.js --no-tile --artwork=swatches/your-pattern.jpg
 
 ## **📂 What You'll Get**
 
-Your generated mockups will appear in the `mockups/` folder:
-- `output41.jpg` - Your first mockup
-- `output42.jpg` - Your second mockup
-- `output43.jpg` - And so on...
+Your generated mockups will appear in product-specific folders:
+- `mockups/curtain/output.jpg` - Your first curtain mockup
+- `mockups/curtain/output1.jpg` - Your second curtain mockup
+- `mockups/tshirt/output.jpg` - Your first t-shirt mockup
+- `mockups/mobile_cover/output.jpg` - Your first mobile cover mockup
+- And so on for each product type...
 
 ## **🎨 Example Results**
 
 Here are some sample mockups created with this tool to show you what to expect:
 
-### **Sample Outputs:**
+### **Curtain Mockups:**
 
-![Mockup Example 1](mockups/output41.jpg)
-*output41.jpg - Tiled pattern covering entire surface*
+![Curtain Example 1](mockups/curtain/output12.jpg)
+*Curtain with tiled pattern covering entire surface*
 
-![Mockup Example 2](mockups/output40.jpg)
-*output40.jpg - Different artwork with automatic tiling*
+![Curtain Example 2](mockups/curtain/output13.jpg)
+*Curtain with different artwork and automatic tiling*
 
-![Mockup Example 3](mockups/output43.jpg)
-*output43.jpg - Pattern variation showing full coverage*
+![Curtain Example 3](mockups/curtain/output8.jpg)
+*Curtain pattern variation showing full coverage*
+
+### **T-shirt Mockups:**
+
+![T-shirt Example 1](mockups/tshirt/output.jpg)
+*T-shirt with tiled pattern*
+
+![T-shirt Example 2](mockups/tshirt/output1.jpg)
+*T-shirt with different artwork*
+
+![T-shirt Example 3](mockups/tshirt/output2.jpg)
+*T-shirt pattern variation*
 
 *These examples show how the tool automatically tiles your patterns across the entire surface of your product mockup, creating professional-looking results!*
 

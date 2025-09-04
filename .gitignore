@@ -208,11 +208,12 @@ mask_processed.png
 
 # Keep some sample mockups but ignore most
 mockups/*
-!mockups/output40.jpg
-!mockups/output41.jpg
-!mockups/output42.jpg
-!mockups/output43.jpg
-!mockups/output44.jpg
+!mockups/curtain/output12.jpg
+!mockups/curtain/output13.jpg
+!mockups/curtain/output8.jpg
+!mockups/tshirt/output.jpg
+!mockups/tshirt/output1.jpg
+!mockups/tshirt/output2.jpg
 !mockups/mobile_cover/output15.jpg
 !mockups/mobile_cover/output16.jpg
 !mockups/mobile_cover/output17.jpg
