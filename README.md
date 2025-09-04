@@ -44,7 +44,7 @@ convert --version
 
 ```bash
 # Clone this project
-git clone <your-repo-url>
+git clone https://github.com/adeelfeb/mockup
 cd mockup
 
 # Install the required libraries

@@ -1,7 +1,3 @@
-// const { execSync } = require('child_process');
-// const fs = require('fs');
-// const path = require('path');
-// const os = require("os")
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -255,7 +251,7 @@ const useDynamic = args.includes('--dynamic') || args.includes('-d');
 const disableTiling = args.includes('--no-tile') || args.includes('--single');
 const useTiling = !disableTiling; // Tiling is now DEFAULT, use --no-tile to disable
 const artworkArg = args.find(arg => arg.startsWith('--artwork=')) || args.find(arg => arg.startsWith('-a='));
-const artworkFile = artworkArg ? artworkArg.split('=')[1] : "swatches/art9.jpg";
+const artworkFile = artworkArg ? artworkArg.split('=')[1] : "swatches/art6.jpg";
 
 console.log(`Using ${useDynamic ? 'dynamic' : 'original'} coordinates`);
 console.log(`Tiling: ${useTiling ? 'enabled (DEFAULT)' : 'disabled'}`);
