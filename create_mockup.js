@@ -25,20 +25,20 @@ async function tileArtwork(params) {
   
   // Calculate optimal tile size based on mask dimensions
   // We want the pattern to be visible but not too small or too large
-  const minTileSize = Math.min(maskWidth, maskHeight) / 8; // Minimum 1/8 of smallest dimension
-  const maxTileSize = Math.min(maskWidth, maskHeight) / 2; // Maximum 1/2 of smallest dimension
+  const minTileSize = Math.min(maskWidth, maskHeight) / 6; // Minimum 1/6 of smallest dimension (was 1/8)
+  const maxTileSize = Math.min(maskWidth, maskHeight) / 1.5; // Maximum 2/3 of smallest dimension (was 1/2)
   
   // Calculate scale factor to fit artwork within optimal tile size range
   const artworkAspectRatio = artworkWidth / artworkHeight;
   let tileWidth, tileHeight;
   
   if (artworkAspectRatio > 1) {
-    // Landscape artwork
-    tileWidth = Math.min(maxTileSize, Math.max(minTileSize, maskWidth / 4));
+    // Landscape artwork - use 1/2 of mask width instead of 1/4 for bigger tiles
+    tileWidth = Math.min(maxTileSize, Math.max(minTileSize, maskWidth / 2));
     tileHeight = tileWidth / artworkAspectRatio;
   } else {
-    // Portrait or square artwork
-    tileHeight = Math.min(maxTileSize, Math.max(minTileSize, maskHeight / 4));
+    // Portrait or square artwork - use 1/2 of mask height instead of 1/4 for bigger tiles
+    tileHeight = Math.min(maxTileSize, Math.max(minTileSize, maskHeight / 2));
     tileWidth = tileHeight * artworkAspectRatio;
   }
   
@@ -226,11 +226,20 @@ async function perspectiveTransform(params) {
       console.log(`Scale factors: scaleX=${scaleX}, scaleY=${scaleY}`);
       console.log(`Perspective offset: ${perspectiveOffset}`);
       
+      // Expand the destination area slightly to ensure complete coverage
+      const expansionFactor = 1.1; // 10% expansion
+      const expandedOffsetX = Math.max(0, maskArea.offsetX - (maskArea.width * 0.05));
+      const expandedOffsetY = Math.max(0, maskArea.offsetY - (maskArea.height * 0.05));
+      const expandedWidth = Math.min(templateWidth, (maskArea.width + maskArea.width * 0.1));
+      const expandedHeight = Math.min(templateHeight, (maskArea.height + maskArea.height * 0.1));
+      
+      console.log(`Expanded area: ${expandedWidth}x${expandedHeight} at (${expandedOffsetX}, ${expandedOffsetY})`);
+      
       const dstCoords = [
-        maskArea.offsetX * scaleX, maskArea.offsetY * scaleY,                                    // top-left
-        (maskArea.offsetX + maskArea.width) * scaleX, maskArea.offsetY * scaleY,                   // top-right  
-        (maskArea.offsetX + perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY,     // bottom-left (with perspective)
-        (maskArea.offsetX + maskArea.width - perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY  // bottom-right (with perspective)
+        expandedOffsetX * scaleX, expandedOffsetY * scaleY,                                    // top-left
+        (expandedOffsetX + expandedWidth) * scaleX, expandedOffsetY * scaleY,                   // top-right  
+        (expandedOffsetX + perspectiveOffset) * scaleX, (expandedOffsetY + expandedHeight) * scaleY,     // bottom-left (with perspective)
+        (expandedOffsetX + expandedWidth - perspectiveOffset) * scaleX, (expandedOffsetY + expandedHeight) * scaleY  // bottom-right (with perspective)
       ];
       
       console.log('Destination coordinates:', dstCoords);
@@ -263,11 +272,20 @@ async function perspectiveTransform(params) {
     console.log(`Scale factors: scaleX=${scaleX}, scaleY=${scaleY}`);
     console.log(`Perspective offset: ${perspectiveOffset}`);
     
+    // Expand the destination area slightly to ensure complete coverage
+    const expansionFactor = 1.1; // 10% expansion
+    const expandedOffsetX = Math.max(0, maskArea.offsetX - (maskArea.width * 0.05));
+    const expandedOffsetY = Math.max(0, maskArea.offsetY - (maskArea.height * 0.05));
+    const expandedWidth = Math.min(templateWidth, (maskArea.width + maskArea.width * 0.1));
+    const expandedHeight = Math.min(templateHeight, (maskArea.height + maskArea.height * 0.1));
+    
+    console.log(`Expanded area: ${expandedWidth}x${expandedHeight} at (${expandedOffsetX}, ${expandedOffsetY})`);
+    
     const dstCoords = [
-      maskArea.offsetX * scaleX, maskArea.offsetY * scaleY,                                    // top-left
-      (maskArea.offsetX + maskArea.width) * scaleX, maskArea.offsetY * scaleY,                   // top-right  
-      (maskArea.offsetX + perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY,     // bottom-left (with perspective)
-      (maskArea.offsetX + maskArea.width - perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY  // bottom-right (with perspective)
+      expandedOffsetX * scaleX, expandedOffsetY * scaleY,                                    // top-left
+      (expandedOffsetX + expandedWidth) * scaleX, expandedOffsetY * scaleY,                   // top-right  
+      (expandedOffsetX + perspectiveOffset) * scaleX, (expandedOffsetY + expandedHeight) * scaleY,     // bottom-left (with perspective)
+      (expandedOffsetX + expandedWidth - perspectiveOffset) * scaleX, (expandedOffsetY + expandedHeight) * scaleY  // bottom-right (with perspective)
     ];
     
     console.log('Destination coordinates:', dstCoords);
@@ -333,10 +351,17 @@ async function generateMockup(params) {
     const maskArea = await analyzeMaskArea(mask);
     console.log('Detected mask area:', maskArea);
     
-    console.log(`Resizing artwork to fit ONLY mask area: ${maskArea.width}x${maskArea.height}`);
+    console.log(`Resizing artwork to OVERFILL mask area: ${maskArea.width}x${maskArea.height}`);
     
-    // Scale artwork to fit ONLY the mask area (same as tiled but without tiling)
-    const resizeCmd = `convert ${artwork} -resize ${maskArea.width}x${maskArea.height}! -background transparent -gravity center -extent ${maskArea.width}x${maskArea.height} ${tmp}`;
+    // Scale artwork to be LARGER than mask area to ensure complete coverage
+    // Add 20% extra size to ensure no gaps, then crop to exact dimensions
+    const extraSize = 1.2; // 20% larger
+    const oversizedWidth = Math.ceil(maskArea.width * extraSize);
+    const oversizedHeight = Math.ceil(maskArea.height * extraSize);
+    
+    console.log(`Oversized dimensions: ${oversizedWidth}x${oversizedHeight}`);
+    
+    const resizeCmd = `convert ${artwork} -resize ${oversizedWidth}x${oversizedHeight}^ -background transparent -gravity center -extent ${maskArea.width}x${maskArea.height} ${tmp}`;
     console.log('Resize command:', resizeCmd);
     await execShellCommand(resizeCmd);
     
