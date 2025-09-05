@@ -75,6 +75,18 @@ async function tileArtwork(params) {
   }
 }
 
+async function getArtworkAspectRatio(artworkPath) {
+  try {
+    const getDimensions = `identify -format "%wx%h" ${artworkPath}`;
+    const dimensions = execSync(getDimensions, { encoding: 'utf8' }).trim();
+    const [width, height] = dimensions.split('x').map(Number);
+    return width / height;
+  } catch (error) {
+    console.log('Error getting artwork dimensions:', error.message);
+    return 1; // Default to square aspect ratio
+  }
+}
+
 async function analyzeMaskArea(maskPath) {
   try {
     // Get the actual mask dimensions first
@@ -189,13 +201,19 @@ async function perspectiveTransform(params) {
       
       coordinates = [...srcCoords, ...dstCoords].join(',');
     } else {
-      // Use coordinates adapted for single artwork - scale to fit mask area
+      // Use coordinates adapted for single artwork - use detected mask area
+      console.log('=== PERSPECTIVE TRANSFORM - NON-TILED ===');
       console.log('Using coordinates adapted for single artwork');
-      const maskArea = await analyzeMaskArea(mask);
-      console.log('Mask area for single artwork:', maskArea);
       
-      // Source coordinates (artwork corners)
-      const srcCoords = [0, 0, artworkWidth, 0, 0, artworkHeight, artworkWidth, artworkHeight];
+      // Get the actual mask area dimensions (not the full mask image)
+      const maskArea = await analyzeMaskArea(mask);
+      console.log('Detected mask area:', maskArea);
+      
+      console.log(`Template dimensions: ${templateWidth}x${templateHeight}`);
+      
+      // Source coordinates (artwork corners - matches mask area dimensions)
+      const srcCoords = [0, 0, maskArea.width, 0, 0, maskArea.height, maskArea.width, maskArea.height];
+      console.log('Source coordinates:', srcCoords);
       
       // Destination coordinates (mask area with perspective) - scale to template dimensions
       const getMaskDimensions = `identify -format "%wx%h" ${mask}`;
@@ -205,6 +223,9 @@ async function perspectiveTransform(params) {
       const scaleY = templateHeight / maskHeight;
       const perspectiveOffset = Math.min(50, maskArea.width * 0.1) * scaleX;
       
+      console.log(`Scale factors: scaleX=${scaleX}, scaleY=${scaleY}`);
+      console.log(`Perspective offset: ${perspectiveOffset}`);
+      
       const dstCoords = [
         maskArea.offsetX * scaleX, maskArea.offsetY * scaleY,                                    // top-left
         (maskArea.offsetX + maskArea.width) * scaleX, maskArea.offsetY * scaleY,                   // top-right  
@@ -212,23 +233,35 @@ async function perspectiveTransform(params) {
         (maskArea.offsetX + maskArea.width - perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY  // bottom-right (with perspective)
       ];
       
+      console.log('Destination coordinates:', dstCoords);
+      
       coordinates = [...srcCoords, ...dstCoords].join(',');
+      console.log('Final coordinates string:', coordinates);
     }
   } else {
-    // Analyze the mask to get the actual area where artwork should be placed
+    // For non-tiled images, use detected mask area
+    console.log('Using detected mask area for non-tiled artwork');
+    
+    // Get the actual mask area dimensions (not the full mask image)
     const maskArea = await analyzeMaskArea(mask);
     console.log('Detected mask area:', maskArea);
     
-    // Source coordinates (artwork corners)
-    const srcCoords = [0, 0, artworkWidth, 0, 0, artworkHeight, artworkWidth, artworkHeight];
+    console.log(`Template dimensions: ${templateWidth}x${templateHeight}`);
     
-    // Destination coordinates (mask area corners) - scale to template dimensions
+    // Source coordinates (artwork corners - matches mask area dimensions)
+    const srcCoords = [0, 0, maskArea.width, 0, 0, maskArea.height, maskArea.width, maskArea.height];
+    console.log('Source coordinates:', srcCoords);
+    
+    // Destination coordinates (mask area with perspective) - scale to template dimensions
     const getMaskDimensions = `identify -format "%wx%h" ${mask}`;
     const maskDimensions = execSync(getMaskDimensions, { encoding: 'utf8' }).trim();
     const [maskWidth, maskHeight] = maskDimensions.split('x').map(Number);
     const scaleX = templateWidth / maskWidth;
     const scaleY = templateHeight / maskHeight;
     const perspectiveOffset = Math.min(50, maskArea.width * 0.1) * scaleX;
+    
+    console.log(`Scale factors: scaleX=${scaleX}, scaleY=${scaleY}`);
+    console.log(`Perspective offset: ${perspectiveOffset}`);
     
     const dstCoords = [
       maskArea.offsetX * scaleX, maskArea.offsetY * scaleY,                                    // top-left
@@ -237,7 +270,10 @@ async function perspectiveTransform(params) {
       (maskArea.offsetX + maskArea.width - perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY  // bottom-right (with perspective)
     ];
     
+    console.log('Destination coordinates:', dstCoords);
+    
     coordinates = [...srcCoords, ...dstCoords].join(',');
+    console.log('Final coordinates string:', coordinates);
   }
   
   console.log('Using coordinates:', coordinates);
@@ -277,9 +313,10 @@ async function composeArtwork(params) {
 }
 
 async function generateMockup(params) {
-  const { artwork, template, displacementMap, lightingMap, adjustmentMap, mask, out, useOriginalCoords = true, useTiling = false } = params;
+  const { artwork, template, displacementMap, lightingMap, adjustmentMap, mask, out, useOriginalCoords = true, useTiling = true } = params;
   const tmp = path.join(os.tmpdir(), `${Math.random().toString(36).substring(7)}.mpc`);
   const tmp2 = path.join(os.tmpdir(), `${Math.random().toString(36).substring(7)}.mpc`);
+  
   
   if (useTiling) {
     // First tile the artwork to cover the mask area
@@ -288,17 +325,63 @@ async function generateMockup(params) {
     await perspectiveTransform({ template, artwork: tmp2, mask, out: tmp2, useOriginalCoords, isTiled: true });
     fs.unlinkSync(tmp);
   } else {
-  await addBorder({ artwork, out: tmp });
-    await perspectiveTransform({ template, artwork: tmp, mask, out: tmp, useOriginalCoords, isTiled: false });
+    // For non-tiled images, shrink artwork to fit mask area and use same mapping as tiled
+    console.log('=== NON-TILED PATH ===');
+    console.log('Original artwork path:', artwork);
+    
+    // Get the actual mask area dimensions (not the full mask image)
+    const maskArea = await analyzeMaskArea(mask);
+    console.log('Detected mask area:', maskArea);
+    
+    console.log(`Resizing artwork to fit ONLY mask area: ${maskArea.width}x${maskArea.height}`);
+    
+    // Scale artwork to fit ONLY the mask area (same as tiled but without tiling)
+    const resizeCmd = `convert ${artwork} -resize ${maskArea.width}x${maskArea.height}! -background transparent -gravity center -extent ${maskArea.width}x${maskArea.height} ${tmp}`;
+    console.log('Resize command:', resizeCmd);
+    await execShellCommand(resizeCmd);
+    
+    // Check if resize worked
+    const checkResize = `identify -format "%wx%h" ${tmp}`;
+    const resizedDimensions = execSync(checkResize, { encoding: 'utf8' }).trim();
+    console.log('Resized artwork dimensions:', resizedDimensions);
+    
+    await addBorder({ artwork: tmp, out: tmp2 });
+    console.log('Added border to artwork');
+    
+    // Use the same perspective transform as tiled images but with isTiled=false
+    await perspectiveTransform({ template, artwork: tmp2, mask, out: tmp2, useOriginalCoords, isTiled: false });
+    console.log('Applied perspective transform for non-tiled image');
+    
+    fs.unlinkSync(tmp);
   }
   
   // await setBackgroundColor({ artwork: tmp, color: 'black', out: tmp });
-  await addDisplacement({ artwork: useTiling ? tmp2 : tmp, displacementMap, out: useTiling ? tmp2 : tmp });
-  await addHighlights({ artwork: useTiling ? tmp2 : tmp, lightingMap, out: useTiling ? tmp2 : tmp });
-  await adjustColors({ artwork: useTiling ? tmp2 : tmp, adjustmentMap, out: useTiling ? tmp2 : tmp });
-  await composeArtwork({ template, artwork: useTiling ? tmp2 : tmp, mask, out });
+  console.log('=== FINAL PROCESSING STEPS ===');
+  console.log('useTiling:', useTiling);
+  console.log('Using artwork file:', tmp2);
   
-  fs.unlinkSync(useTiling ? tmp2 : tmp);
+  // Apply the same effects for both tiled and non-tiled images
+  await addDisplacement({ artwork: tmp2, displacementMap, out: tmp2 });
+  console.log('Applied displacement');
+  
+  await addHighlights({ artwork: tmp2, lightingMap, out: tmp2 });
+  console.log('Applied highlights');
+  
+  await adjustColors({ artwork: tmp2, adjustmentMap, out: tmp2 });
+  console.log('Applied color adjustments');
+  
+  console.log('=== COMPOSING ARTWORK ===');
+  console.log('Template:', template);
+  console.log('Artwork:', tmp2);
+  console.log('Mask:', mask);
+  console.log('Output:', out);
+  
+  // Use the same composition method for both tiled and non-tiled
+  await composeArtwork({ template, artwork: tmp2, mask, out });
+  console.log('Composed artwork with template');
+  
+  fs.unlinkSync(tmp2);
+  console.log('Cleaned up temporary files');
 }
 
 function execShellCommand(command) {
@@ -494,6 +577,7 @@ async function generateMockupFromImage(imageInput, productName, options = {}) {
         useTiling = true,
         quality = 90
     } = options;
+    
     
     // Validate product exists
     const baseDir = `base_images/${productName}`;

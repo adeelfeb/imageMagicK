@@ -1,0 +1,26 @@
+{
+  "watch": [
+    "server.js",
+    "routes/",
+    "controllers/",
+    "utils/",
+    "create_mockup.js",
+    "mockup_processor.js"
+  ],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules/",
+    "mockups/",
+    "uploads/",
+    "temp/",
+    "mpcs/",
+    "*.log"
+  ],
+  "delay": 1000,
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "verbose": true,
+  "restartable": "rs",
+  "colours": true
+}

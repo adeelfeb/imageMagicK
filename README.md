@@ -4,7 +4,7 @@ Hey there! 👋 This is your one-stop solution for creating stunning product moc
 
 ## **🚀 What You Get**
 
-- **Multiple Products**: T-shirts, mobile covers, curtains, mugs, and hoodies
+- **Multiple Products**: Curtains, mobile covers, curtains, mugs, and hoodies
 - **Smart Tiling**: Automatic pattern tiling across entire surfaces
 - **REST API**: Generate mockups via HTTP requests from any application
 - **No File Storage**: Images returned directly in responses
@@ -17,13 +17,22 @@ Hey there! 👋 This is your one-stop solution for creating stunning product moc
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install nodejs npm imagemagick python3 python3-pip -y
+sudo apt install nodejs npm imagemagick -y
 ```
 
 ### **Step 2: Setup Project**
 
+**For Local Environment (WSL2):**
+```bash
+cd /home/anya/mockup/mockup
+```
+
+**For Online/Server Environment:**
 ```bash
 cd mockup
+```
+
+```bash
 npm install
 ```
 
@@ -35,11 +44,23 @@ npm install
 
 ### **Step 4: Start the API Server**
 
+**For Production:**
 ```bash
 npm start
 ```
 
+**For Development (with auto-restart):**
+```bash
+npm run dev
+```
+
 That's it! Your server is now running on `http://localhost:5002` 🎉
+
+### **Development Mode Features:**
+- **Auto-restart**: Server automatically restarts when you make changes
+- **File watching**: Monitors all JavaScript files for changes
+- **Hot reload**: No need to manually stop/start the server
+- **Verbose logging**: Shows detailed restart information
 
 ## **🎯 Perfect for API Integration**
 
@@ -86,7 +107,7 @@ node create_mockup.js --product=mobile_cover --artwork=swatches/art2.jpg
 
 | Product | Best For | Pattern Size | Tiling |
 |---------|----------|--------------|--------|
-| **T-shirt** | Apparel designs | 300x300px | ✅ Recommended |
+| **Curtain** | Apparel designs | 300x300px | ✅ Recommended |
 | **Mobile Cover** | Phone cases | 400x600px | ✅ Optional |
 | **Curtain** | Home decor | Any size | ✅ Recommended |
 | **Mug** | Drinkware | 300x300px | ✅ Recommended |
@@ -96,16 +117,15 @@ node create_mockup.js --product=mobile_cover --artwork=swatches/art2.jpg
 
 Here are some real mockups generated with this tool:
 
-### **T-shirt Mockups**
+### **Curtain Mockups**
 
-![T-shirt Example 1](mockups/tshirt/output.jpg)
-*T-shirt with geometric pattern*
 
-![T-shirt Example 2](mockups/tshirt/output1.jpg)
-*T-shirt with floral design*
 
-![T-shirt Example 3](mockups/tshirt/output2.jpg)
-*T-shirt with abstract pattern*
+![Curtain Example 2](mockups/tshirt/output1.jpg)
+*Curtain with floral design*
+
+![Curtain Example 3](mockups/tshirt/output2.jpg)
+*Curtain with abstract pattern*
 
 ### **Mobile Cover Mockups**
 
@@ -307,9 +327,17 @@ Images should be under 50MB
 ### **Available Scripts**
 ```bash
 npm start          # Start production server
-npm run dev        # Start with auto-restart
+npm run dev        # Start development server with auto-restart (nodemon)
 npm test           # Run API tests
+npm run build      # Build check (no build step required)
+npm run lint       # Lint check (no linting configured)
 ```
+
+### **Development Workflow**
+1. **Start development server**: `npm run dev`
+2. **Make changes** to any JavaScript file
+3. **Server auto-restarts** when you save changes
+4. **Test your changes** immediately without manual restart
 
 ## **🎉 That's It!**
 

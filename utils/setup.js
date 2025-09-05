@@ -140,3 +140,4 @@ export function getProductStatus(productName) {
         error: status.isReady ? null : (status.hasBaseImages ? 'Missing maps' : 'Missing base images')
     };
 }
+

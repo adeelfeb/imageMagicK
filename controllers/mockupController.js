@@ -76,7 +76,16 @@ export const getProductStatus = async (req, res) => {
 export const generateMockup = async (req, res) => {
     try {
         const { product } = req.params;
-        const { useDynamic = false, useTiling = true } = req.body;
+        let { useDynamic = false, useTiling = true } = req.body;
+        
+        // Convert string values to boolean if needed
+        if (typeof useTiling === 'string') {
+            useTiling = useTiling.toLowerCase() === 'true';
+        }
+        if (typeof useDynamic === 'string') {
+            useDynamic = useDynamic.toLowerCase() === 'true';
+        }
+        
         
         if (!req.file) {
             return res.status(400).json({
@@ -132,7 +141,15 @@ export const generateMockup = async (req, res) => {
  */
 export const generateAllMockups = async (req, res) => {
     try {
-        const { useDynamic = false, useTiling = true } = req.body;
+        let { useDynamic = false, useTiling = true } = req.body;
+        
+        // Convert string values to boolean if needed
+        if (typeof useTiling === 'string') {
+            useTiling = useTiling.toLowerCase() === 'true';
+        }
+        if (typeof useDynamic === 'string') {
+            useDynamic = useDynamic.toLowerCase() === 'true';
+        }
         
         if (!req.file) {
             return res.status(400).json({
@@ -236,7 +253,15 @@ export const generateAllMockups = async (req, res) => {
 export const generateMockupFromBase64 = async (req, res) => {
     try {
         const { product } = req.params;
-        const { imageData, useDynamic = false, useTiling = true } = req.body;
+        let { imageData, useDynamic = false, useTiling = true } = req.body;
+        
+        // Convert string values to boolean if needed
+        if (typeof useTiling === 'string') {
+            useTiling = useTiling.toLowerCase() === 'true';
+        }
+        if (typeof useDynamic === 'string') {
+            useDynamic = useDynamic.toLowerCase() === 'true';
+        }
         
         if (!imageData) {
             return res.status(400).json({
@@ -283,7 +308,15 @@ export const generateMockupFromBase64 = async (req, res) => {
  */
 export const generateAllMockupsFromBase64 = async (req, res) => {
     try {
-        const { imageData, useDynamic = false, useTiling = true } = req.body;
+        let { imageData, useDynamic = false, useTiling = true } = req.body;
+        
+        // Convert string values to boolean if needed
+        if (typeof useTiling === 'string') {
+            useTiling = useTiling.toLowerCase() === 'true';
+        }
+        if (typeof useDynamic === 'string') {
+            useDynamic = useDynamic.toLowerCase() === 'true';
+        }
         
         if (!imageData) {
             return res.status(400).json({
