@@ -255,6 +255,12 @@ The server accepts requests from:
 - `http://localhost:5001`
 - Add your production domains as needed
 
+### **Deployment Options**
+- **AWS EC2**: 12 months free tier
+- **Google Cloud**: Always free tier available
+- **DigitalOcean**: $5/month for reliable hosting
+- **VPS**: Full control with any provider
+
 ## **🚨 Troubleshooting**
 
 ### **"Product not ready"**

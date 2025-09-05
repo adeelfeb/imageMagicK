@@ -115,126 +115,112 @@ curl http://your-server-ip:5002/health
 curl http://your-server-ip:5002/api/mockup/products
 ```
 
-## **Option 2: Free Tier Cloud Services**
+## **Option 2: Cloud VPS (Free Tier)**
 
-### **🌟 Railway (Recommended - Free Tier)**
+### **🌟 AWS EC2 (Recommended - Free Tier)**
 
-Railway offers excellent free tier with easy deployment:
+AWS offers the best free tier for API-only servers:
 
-#### **Deployment Steps:**
-1. **Sign up** at [railway.app](https://railway.app)
-2. **Connect GitHub** repository
-3. **Add Environment Variables:**
-   ```
-   NODE_ENV=production
-   PORT=5002
-   ```
-4. **Deploy** - Railway auto-detects Node.js
-5. **Add ImageMagick** via Railway's Nixpacks
-
-#### **Railway Configuration:**
-```json
-{
-  "build": {
-    "builder": "nixpacks"
-  },
-  "deploy": {
-    "startCommand": "npm start",
-    "healthcheckPath": "/health"
-  }
-}
-```
-
-#### **Pros:**
-- ✅ Free tier: $5 credit monthly
-- ✅ Automatic deployments
-- ✅ Built-in monitoring
-- ✅ Easy scaling
-
-#### **Cons:**
-- ❌ ImageMagick needs custom setup
-- ❌ Limited free tier
-
-### **🌟 Render (Free Tier Available)**
+#### **What You Get:**
+- **EC2 t2.micro**: 750 hours/month for 12 months
+- **1GB RAM, 1 vCPU**
+- **30GB storage**
+- **Ubuntu 20.04/22.04**
+- **Perfect for your mockup API**
 
 #### **Deployment Steps:**
-1. **Sign up** at [render.com](https://render.com)
-2. **Connect GitHub** repository
-3. **Create Web Service**
-4. **Configure:**
-   - Build Command: `npm install`
-   - Start Command: `npm start`
-   - Environment: `NODE_ENV=production`
-
-#### **Render Configuration:**
-```yaml
-services:
-  - type: web
-    name: mockup-api
-    env: node
-    buildCommand: npm install
-    startCommand: npm start
-    envVars:
-      - key: NODE_ENV
-        value: production
-```
-
-#### **Pros:**
-- ✅ Free tier available
-- ✅ Automatic SSL
-- ✅ Easy GitHub integration
-
-#### **Cons:**
-- ❌ ImageMagick not pre-installed
-- ❌ Free tier has limitations
-
-### **🌟 Heroku (Limited Free Tier)**
-
-#### **Deployment Steps:**
-1. **Install Heroku CLI**
-2. **Login and create app:**
+1. **Create AWS Account** at [aws.amazon.com](https://aws.amazon.com)
+2. **Launch EC2 Instance:**
+   - Choose Ubuntu 22.04 LTS
+   - Select t2.micro (Free tier eligible)
+   - Create/Select Key Pair
+   - Configure Security Group (SSH, HTTP, Custom TCP 5002)
+3. **Connect to Server:**
    ```bash
-   heroku login
-   heroku create your-mockup-api
+   ssh -i your-key.pem ubuntu@your-server-ip
    ```
-3. **Add ImageMagick buildpack:**
+4. **Setup Environment:**
    ```bash
-   heroku buildpacks:add https://github.com/ello/heroku-buildpack-imagemagick
-   heroku buildpacks:add heroku/nodejs
+   sudo apt update && sudo apt upgrade -y
+   curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+   sudo apt-get install -y nodejs
+   sudo apt install imagemagick -y
+   sudo npm install -g pm2
    ```
-4. **Deploy:**
+5. **Deploy Application:**
    ```bash
-   git push heroku main
+   git clone https://github.com/yourusername/mockup-generator.git
+   cd mockup-generator
+   npm install
+   ./create_maps.sh
+   pm2 start server.js
+   pm2 save
+   pm2 startup
    ```
 
 #### **Pros:**
-- ✅ Easy deployment
-- ✅ Good documentation
-- ✅ Add-ons available
-
-#### **Cons:**
-- ❌ No free tier (paid only)
-- ❌ Complex ImageMagick setup
-
-### **🌟 DigitalOcean App Platform (Free Tier)**
-
-#### **Deployment Steps:**
-1. **Sign up** at [DigitalOcean](https://digitalocean.com)
-2. **Create App** from GitHub
-3. **Configure:**
-   - Source: GitHub repository
-   - Type: Web Service
-   - Build Command: `npm install`
-   - Run Command: `npm start`
-
-#### **Pros:**
-- ✅ Free tier: $5 credit monthly
+- ✅ 12 months completely free
+- ✅ Full Linux control
+- ✅ ImageMagick works perfectly
+- ✅ Production ready
 - ✅ Easy setup
-- ✅ Good performance
 
 #### **Cons:**
-- ❌ ImageMagick needs custom Dockerfile
-- ❌ Limited free tier
+- ❌ Requires credit card (won't charge for free tier)
+- ❌ 12-month limit
+
+### **🌟 Google Cloud Platform (Free Tier)**
+
+#### **What You Get:**
+- **e2-micro**: 720 hours/month
+- **1GB RAM, 1 vCPU**
+- **30GB storage**
+- **Ubuntu 20.04/22.04**
+- **$300 credit for 90 days**
+
+#### **Deployment Steps:**
+1. **Create GCP Account** at [cloud.google.com](https://cloud.google.com)
+2. **Create VM Instance:**
+   - Choose e2-micro (Free tier)
+   - Select Ubuntu 22.04
+   - Allow HTTP traffic
+3. **Connect and Setup** (same as AWS)
+
+#### **Pros:**
+- ✅ Always free tier available
+- ✅ $300 credit for 90 days
+- ✅ Full Linux control
+- ✅ ImageMagick works perfectly
+
+#### **Cons:**
+- ❌ Requires credit card
+- ❌ More complex than AWS
+
+### **🌟 DigitalOcean Droplet (Paid)**
+
+#### **What You Get:**
+- **Basic Droplet**: $5/month
+- **1GB RAM, 1 vCPU**
+- **25GB storage**
+- **Ubuntu 20.04/22.04**
+
+#### **Deployment Steps:**
+1. **Create DigitalOcean Account**
+2. **Create Droplet:**
+   - Choose Ubuntu 22.04
+   - Select Basic $5/month plan
+   - Add SSH key
+3. **Connect and Setup** (same as AWS)
+
+#### **Pros:**
+- ✅ Very reliable
+- ✅ Simple pricing
+- ✅ Good documentation
+- ✅ Easy setup
+
+#### **Cons:**
+- ❌ No free tier
+- ❌ $5/month cost
 
 ## **Option 3: Docker Deployment**
 
@@ -407,40 +393,58 @@ clinic doctor -- node server.js
 
 | Service | Free Tier | Paid Plans | ImageMagick | API-Only Ready |
 |---------|-----------|------------|-------------|----------------|
-| **Railway** | $5 credit/month | $5+/month | ✅ Custom | ⭐⭐⭐⭐⭐ |
-| **Render** | 750 hours/month | $7+/month | ❌ Complex | ⭐⭐⭐⭐ |
-| **Heroku** | None | $7+/month | ✅ Buildpack | ⭐⭐⭐⭐ |
-| **DigitalOcean** | $5 credit/month | $5+/month | ✅ Docker | ⭐⭐⭐⭐ |
-| **VPS (DO/Linode)** | None | $5+/month | ✅ Native | ⭐⭐⭐⭐⭐ |
-| **Vercel** | 100GB bandwidth | $20+/month | ❌ Not supported | ⭐⭐⭐ |
+| **AWS EC2** | 750 hours/month | $5+/month | ✅ Native | ⭐⭐⭐⭐⭐ |
+| **Google Cloud** | 720 hours/month | $5+/month | ✅ Native | ⭐⭐⭐⭐⭐ |
+| **DigitalOcean** | None | $5+/month | ✅ Native | ⭐⭐⭐⭐⭐ |
+| **Linode** | None | $5+/month | ✅ Native | ⭐⭐⭐⭐⭐ |
+| **Vultr** | None | $2.50+/month | ✅ Native | ⭐⭐⭐⭐⭐ |
 
 ## **🎯 Recommended Deployment Strategy**
 
 ### **For Testing/Development:**
-1. **Railway** - Best free tier with ImageMagick support
-2. **Render** - Good alternative with free tier
+1. **AWS EC2** - 12 months completely free
+2. **Google Cloud** - Always free tier available
 
 ### **For Production:**
-1. **VPS (DigitalOcean/Linode)** - Full control, best performance for API-only
-2. **Railway** - If you prefer managed services
+1. **AWS EC2** - Best free tier, full control
+2. **Google Cloud** - Good alternative with credits
+3. **DigitalOcean** - Simple and reliable
 
 ### **For High Traffic:**
-1. **VPS with PM2 clustering** - Multiple Node.js instances
-2. **AWS EC2** with Load Balancer
+1. **AWS EC2** with Load Balancer
+2. **Google Cloud** with multiple instances
+3. **VPS with PM2 clustering** - Multiple Node.js instances
 
 ## **🚀 Quick Start Commands**
 
-### **Railway Deployment (Recommended)**
+### **AWS EC2 Deployment (Recommended)**
 ```bash
-npm install -g @railway/cli
-railway login
-railway up
-railway variables set NODE_ENV=production
+# 1. Create EC2 instance (via AWS Console)
+# 2. Connect to server
+ssh -i your-key.pem ubuntu@your-server-ip
+
+# 3. Setup environment
+sudo apt update && sudo apt upgrade -y
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+sudo apt install imagemagick -y
+sudo npm install -g pm2
+
+# 4. Deploy application
+git clone https://github.com/yourusername/mockup-generator.git
+cd mockup-generator
+npm install
+./create_maps.sh
+pm2 start server.js
+pm2 save
+pm2 startup
 ```
 
-### **VPS Deployment**
+### **Google Cloud Deployment**
 ```bash
-curl -sSL https://raw.githubusercontent.com/yourusername/mockup-generator/main/deploy.sh | bash
+# 1. Create VM instance (via GCP Console)
+# 2. Connect to server (same as AWS)
+# 3. Run same setup commands as AWS
 ```
 
 ## **🔍 Troubleshooting**
