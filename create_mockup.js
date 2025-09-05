@@ -23,11 +23,46 @@ async function tileArtwork(params) {
   
   console.log(`Tiling artwork ${artworkWidth}x${artworkHeight} to cover mask ${maskWidth}x${maskHeight}`);
   
-  // Use the simplest and most reliable tiling method
-  // Create a canvas of the mask size and tile the artwork across it
-  const tileCmd = `convert -size ${maskWidth}x${maskHeight} tile:${artwork} ${out}`;
-  console.log(`Executing: ${tileCmd}`);
+  // Calculate optimal tile size based on mask dimensions
+  // We want the pattern to be visible but not too small or too large
+  const minTileSize = Math.min(maskWidth, maskHeight) / 8; // Minimum 1/8 of smallest dimension
+  const maxTileSize = Math.min(maskWidth, maskHeight) / 2; // Maximum 1/2 of smallest dimension
+  
+  // Calculate scale factor to fit artwork within optimal tile size range
+  const artworkAspectRatio = artworkWidth / artworkHeight;
+  let tileWidth, tileHeight;
+  
+  if (artworkAspectRatio > 1) {
+    // Landscape artwork
+    tileWidth = Math.min(maxTileSize, Math.max(minTileSize, maskWidth / 4));
+    tileHeight = tileWidth / artworkAspectRatio;
+  } else {
+    // Portrait or square artwork
+    tileHeight = Math.min(maxTileSize, Math.max(minTileSize, maskHeight / 4));
+    tileWidth = tileHeight * artworkAspectRatio;
+  }
+  
+  // Ensure tile dimensions are reasonable
+  tileWidth = Math.max(50, Math.min(tileWidth, maskWidth));
+  tileHeight = Math.max(50, Math.min(tileHeight, maskHeight));
+  
+  console.log(`Optimal tile size: ${Math.round(tileWidth)}x${Math.round(tileHeight)}`);
+  
+  // First, scale the artwork to the optimal tile size
+  const tempScaledArtwork = path.join(os.tmpdir(), `scaled_${Math.random().toString(36).substring(7)}.jpg`);
+  const scaleCmd = `convert ${artwork} -resize ${Math.round(tileWidth)}x${Math.round(tileHeight)}! ${tempScaledArtwork}`;
+  console.log(`Scaling artwork: ${scaleCmd}`);
+  await execShellCommand(scaleCmd);
+  
+  // Then tile the scaled artwork across the mask area
+  const tileCmd = `convert -size ${maskWidth}x${maskHeight} tile:${tempScaledArtwork} ${out}`;
+  console.log(`Tiling scaled artwork: ${tileCmd}`);
   await execShellCommand(tileCmd);
+  
+  // Clean up temporary scaled artwork
+  if (fs.existsSync(tempScaledArtwork)) {
+    fs.unlinkSync(tempScaledArtwork);
+  }
   
   // Verify the tiled output was created successfully
   try {
@@ -42,8 +77,12 @@ async function tileArtwork(params) {
 
 async function analyzeMaskArea(maskPath) {
   try {
-    // First, let's try to find the center area of the mask with a more conservative approach
-    const templateSize = 1836;
+    // Get the actual mask dimensions first
+    const getMaskDimensions = `identify -format "%wx%h" ${maskPath}`;
+    const maskDimensions = execSync(getMaskDimensions, { encoding: 'utf8' }).trim();
+    const [maskWidth, maskHeight] = maskDimensions.split('x').map(Number);
+    
+    console.log(`Analyzing mask area for ${maskWidth}x${maskHeight} mask`);
     
     // Try to find the largest white area but limit it to a reasonable size
     const analyzeCmd = `convert ${maskPath} -threshold 50% -morphology Erode Disk:5 -morphology Dilate Disk:5 -trim -format "%wx%h%O" info:`;
@@ -58,18 +97,20 @@ async function analyzeMaskArea(maskPath) {
       let offsetX = offset ? parseInt(offset[1]) : 0;
       let offsetY = offset ? parseInt(offset[2]) : 0;
       
-      // If the detected area is too large, scale it down to a reasonable size
-      // But don't scale down small areas (like mobile covers) - they should stay their natural size
-      const maxSize = 1200; // Increased max size to accommodate larger products
-      const minSize = 200;  // Minimum size to avoid over-scaling small areas
+      // Calculate reasonable size limits based on actual mask dimensions
+      const maxSize = Math.min(maskWidth, maskHeight) * 0.8; // 80% of smallest dimension
+      const minSize = Math.min(maskWidth, maskHeight) * 0.2; // 20% of smallest dimension
+      
+      console.log(`Detected area: ${width}x${height}, limits: ${Math.round(minSize)}-${Math.round(maxSize)}`);
       
       if (width > maxSize || height > maxSize) {
         const scale = Math.min(maxSize / width, maxSize / height);
         width = Math.floor(width * scale);
         height = Math.floor(height * scale);
         // Re-center the offset
-        offsetX = Math.floor((templateSize - width) / 2);
-        offsetY = Math.floor((templateSize - height) / 2);
+        offsetX = Math.floor((maskWidth - width) / 2);
+        offsetY = Math.floor((maskHeight - height) / 2);
+        console.log(`Scaled down to: ${width}x${height} at (${offsetX}, ${offsetY})`);
       } else if (width < minSize || height < minSize) {
         // For small areas, ensure they're not too tiny but don't over-scale
         const scale = Math.max(minSize / width, minSize / height);
@@ -77,27 +118,32 @@ async function analyzeMaskArea(maskPath) {
           width = Math.floor(width * Math.min(scale, 1.5));
           height = Math.floor(height * Math.min(scale, 1.5));
           // Re-center the offset
-          offsetX = Math.floor((templateSize - width) / 2);
-          offsetY = Math.floor((templateSize - height) / 2);
+          offsetX = Math.floor((maskWidth - width) / 2);
+          offsetY = Math.floor((maskHeight - height) / 2);
+          console.log(`Scaled up to: ${width}x${height} at (${offsetX}, ${offsetY})`);
         }
       }
       
-      console.log(`Detected mask area: ${width}x${height} at (${offsetX}, ${offsetY})`);
+      console.log(`Final mask area: ${width}x${height} at (${offsetX}, ${offsetY})`);
       return { width, height, offsetX, offsetY };
     }
   } catch (error) {
     console.log('Mask analysis failed, using fallback method');
   }
   
-  // Fallback: Use the working coordinates from before
+  // Fallback: Use proportional coordinates based on actual mask size
   console.log('Using fallback coordinates');
-  const templateSize = 1836;
-  const maskSize = 600; // Conservative estimate that was working
+  const getMaskDimensions = `identify -format "%wx%h" ${maskPath}`;
+  const maskDimensions = execSync(getMaskDimensions, { encoding: 'utf8' }).trim();
+  const [maskWidth, maskHeight] = maskDimensions.split('x').map(Number);
+  
+  // Use 60% of the smallest dimension as fallback mask area
+  const maskSize = Math.min(maskWidth, maskHeight) * 0.6;
   return {
-    width: maskSize,
-    height: maskSize,
-    offsetX: (templateSize - maskSize) / 2,
-    offsetY: (templateSize - maskSize) / 2
+    width: Math.floor(maskSize),
+    height: Math.floor(maskSize),
+    offsetX: Math.floor((maskWidth - maskSize) / 2),
+    offsetY: Math.floor((maskHeight - maskSize) / 2)
   };
 }
 
@@ -109,26 +155,36 @@ async function perspectiveTransform(params) {
   const dimensions = execSync(getDimensions, { encoding: 'utf8' }).trim();
   const [artworkWidth, artworkHeight] = dimensions.split('x').map(Number);
   
+  // Get template dimensions for proper scaling
+  const getTemplateDimensions = `identify -format "%wx%h" ${template}`;
+  const templateDimensions = execSync(getTemplateDimensions, { encoding: 'utf8' }).trim();
+  const [templateWidth, templateHeight] = templateDimensions.split('x').map(Number);
+  
   let coordinates;
   
   if (useOriginalCoords) {
     if (isTiled) {
       // For tiled artwork, we need to adjust the coordinates to work with the full tiled dimensions
       console.log('Using original coordinates adapted for tiled artwork');
-      // The tiled artwork is 1836x1836, so we map it to the mask area
       const maskArea = await analyzeMaskArea(mask);
       console.log('Mask area for tiling:', maskArea);
       
       // Source coordinates (full tiled artwork)
       const srcCoords = [0, 0, artworkWidth, 0, 0, artworkHeight, artworkWidth, artworkHeight];
       
-      // Destination coordinates (mask area with perspective)
-      const perspectiveOffset = 50;
+      // Destination coordinates (mask area with perspective) - scale to template dimensions
+      const getMaskDimensions = `identify -format "%wx%h" ${mask}`;
+      const maskDimensions = execSync(getMaskDimensions, { encoding: 'utf8' }).trim();
+      const [maskWidth, maskHeight] = maskDimensions.split('x').map(Number);
+      const scaleX = templateWidth / maskWidth;
+      const scaleY = templateHeight / maskHeight;
+      const perspectiveOffset = Math.min(50, maskArea.width * 0.1) * scaleX;
+      
       const dstCoords = [
-        maskArea.offsetX, maskArea.offsetY,                                    // top-left
-        maskArea.offsetX + maskArea.width, maskArea.offsetY,                   // top-right  
-        maskArea.offsetX + perspectiveOffset, maskArea.offsetY + maskArea.height,     // bottom-left (with perspective)
-        maskArea.offsetX + maskArea.width - perspectiveOffset, maskArea.offsetY + maskArea.height  // bottom-right (with perspective)
+        maskArea.offsetX * scaleX, maskArea.offsetY * scaleY,                                    // top-left
+        (maskArea.offsetX + maskArea.width) * scaleX, maskArea.offsetY * scaleY,                   // top-right  
+        (maskArea.offsetX + perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY,     // bottom-left (with perspective)
+        (maskArea.offsetX + maskArea.width - perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY  // bottom-right (with perspective)
       ];
       
       coordinates = [...srcCoords, ...dstCoords].join(',');
@@ -141,13 +197,19 @@ async function perspectiveTransform(params) {
       // Source coordinates (artwork corners)
       const srcCoords = [0, 0, artworkWidth, 0, 0, artworkHeight, artworkWidth, artworkHeight];
       
-      // Destination coordinates (mask area with perspective)
-      const perspectiveOffset = Math.min(50, maskArea.width * 0.1); // Scale perspective offset to mask size
+      // Destination coordinates (mask area with perspective) - scale to template dimensions
+      const getMaskDimensions = `identify -format "%wx%h" ${mask}`;
+      const maskDimensions = execSync(getMaskDimensions, { encoding: 'utf8' }).trim();
+      const [maskWidth, maskHeight] = maskDimensions.split('x').map(Number);
+      const scaleX = templateWidth / maskWidth;
+      const scaleY = templateHeight / maskHeight;
+      const perspectiveOffset = Math.min(50, maskArea.width * 0.1) * scaleX;
+      
       const dstCoords = [
-        maskArea.offsetX, maskArea.offsetY,                                    // top-left
-        maskArea.offsetX + maskArea.width, maskArea.offsetY,                   // top-right  
-        maskArea.offsetX + perspectiveOffset, maskArea.offsetY + maskArea.height,     // bottom-left (with perspective)
-        maskArea.offsetX + maskArea.width - perspectiveOffset, maskArea.offsetY + maskArea.height  // bottom-right (with perspective)
+        maskArea.offsetX * scaleX, maskArea.offsetY * scaleY,                                    // top-left
+        (maskArea.offsetX + maskArea.width) * scaleX, maskArea.offsetY * scaleY,                   // top-right  
+        (maskArea.offsetX + perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY,     // bottom-left (with perspective)
+        (maskArea.offsetX + maskArea.width - perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY  // bottom-right (with perspective)
       ];
       
       coordinates = [...srcCoords, ...dstCoords].join(',');
@@ -160,14 +222,19 @@ async function perspectiveTransform(params) {
     // Source coordinates (artwork corners)
     const srcCoords = [0, 0, artworkWidth, 0, 0, artworkHeight, artworkWidth, artworkHeight];
     
-    // Destination coordinates (mask area corners)
-    // Apply a slight perspective effect to make it look more natural
-    const perspectiveOffset = 50; // Adjust this for more/less perspective
+    // Destination coordinates (mask area corners) - scale to template dimensions
+    const getMaskDimensions = `identify -format "%wx%h" ${mask}`;
+    const maskDimensions = execSync(getMaskDimensions, { encoding: 'utf8' }).trim();
+    const [maskWidth, maskHeight] = maskDimensions.split('x').map(Number);
+    const scaleX = templateWidth / maskWidth;
+    const scaleY = templateHeight / maskHeight;
+    const perspectiveOffset = Math.min(50, maskArea.width * 0.1) * scaleX;
+    
     const dstCoords = [
-      maskArea.offsetX, maskArea.offsetY,                                    // top-left
-      maskArea.offsetX + maskArea.width, maskArea.offsetY,                   // top-right  
-      maskArea.offsetX + perspectiveOffset, maskArea.offsetY + maskArea.height,     // bottom-left (with perspective)
-      maskArea.offsetX + maskArea.width - perspectiveOffset, maskArea.offsetY + maskArea.height  // bottom-right (with perspective)
+      maskArea.offsetX * scaleX, maskArea.offsetY * scaleY,                                    // top-left
+      (maskArea.offsetX + maskArea.width) * scaleX, maskArea.offsetY * scaleY,                   // top-right  
+      (maskArea.offsetX + perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY,     // bottom-left (with perspective)
+      (maskArea.offsetX + maskArea.width - perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY  // bottom-right (with perspective)
     ];
     
     coordinates = [...srcCoords, ...dstCoords].join(',');
