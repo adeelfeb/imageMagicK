@@ -414,11 +414,118 @@ function checkProductStatus(productName) {
     };
 }
 
+/**
+ * Generate mockup from image buffer/stream - Main reusable function
+ * @param {Buffer|string} imageInput - Image as buffer, file path, or base64 string
+ * @param {string} productName - Name of the product (e.g., 'tshirt', 'mug', 'curtain', 'mobile_cover')
+ * @param {Object} options - Additional options
+ * @returns {Promise<Buffer>} - Generated mockup as buffer
+ */
+async function generateMockupFromImage(imageInput, productName, options = {}) {
+    const {
+        useDynamic = false,
+        useTiling = true,
+        quality = 90
+    } = options;
+    
+    // Validate product exists
+    const baseDir = `base_images/${productName}`;
+    const mapsDir = `maps/${productName}`;
+    
+    if (!fs.existsSync(baseDir)) {
+        throw new Error(`Product '${productName}' not found in base_images/`);
+    }
+    
+    if (!fs.existsSync(mapsDir)) {
+        throw new Error(`Maps for '${productName}' not found. Run ./create_maps.sh ${productName} first.`);
+    }
+    
+    // Check if required files exist
+    const templatePath = `${baseDir}/template.jpg`;
+    const maskPath = `${baseDir}/mask.png`;
+    const displacementPath = `${mapsDir}/displacement_map.png`;
+    const lightingPath = `${mapsDir}/lighting_map.png`;
+    const adjustmentPath = `${mapsDir}/adjustment_map.jpg`;
+    
+    if (!fs.existsSync(templatePath)) {
+        throw new Error(`Template image not found: ${templatePath}`);
+    }
+    if (!fs.existsSync(maskPath)) {
+        throw new Error(`Mask image not found: ${maskPath}`);
+    }
+    if (!fs.existsSync(displacementPath)) {
+        throw new Error(`Displacement map not found: ${displacementPath}`);
+    }
+    if (!fs.existsSync(lightingPath)) {
+        throw new Error(`Lighting map not found: ${lightingPath}`);
+    }
+    if (!fs.existsSync(adjustmentPath)) {
+        throw new Error(`Adjustment map not found: ${adjustmentPath}`);
+    }
+    
+    // Create temporary files for processing
+    const tempArtworkPath = path.join(os.tmpdir(), `artwork_${Math.random().toString(36).substring(7)}.jpg`);
+    const tempOutputPath = path.join(os.tmpdir(), `output_${Math.random().toString(36).substring(7)}.jpg`);
+    
+    try {
+        // Handle different input types
+        if (Buffer.isBuffer(imageInput)) {
+            // Image is a buffer
+            fs.writeFileSync(tempArtworkPath, imageInput);
+        } else if (typeof imageInput === 'string') {
+            if (imageInput.startsWith('data:image/')) {
+                // Base64 string
+                const base64Data = imageInput.replace(/^data:image\/[a-z]+;base64,/, '');
+                fs.writeFileSync(tempArtworkPath, base64Data, 'base64');
+            } else if (fs.existsSync(imageInput)) {
+                // File path
+                fs.copyFileSync(imageInput, tempArtworkPath);
+            } else {
+                throw new Error('Invalid image input: file not found or invalid format');
+            }
+        } else {
+            throw new Error('Invalid image input type');
+        }
+        
+        // Generate mockup using the temporary artwork
+        const mockupParams = {
+            'out': tempOutputPath,
+            'artwork': tempArtworkPath,
+            'template': templatePath,
+            'mask': maskPath,
+            'displacementMap': displacementPath,
+            'lightingMap': lightingPath,
+            'adjustmentMap': adjustmentPath,
+            'useOriginalCoords': !useDynamic,
+            'useTiling': useTiling
+        };
+        
+        console.log(`Generating mockup for ${productName} with provided artwork`);
+        
+        await generateMockup(mockupParams);
+        
+        // Read the generated mockup as buffer
+        const mockupBuffer = fs.readFileSync(tempOutputPath);
+        
+        return mockupBuffer;
+        
+    } finally {
+        // Clean up temporary files
+        if (fs.existsSync(tempArtworkPath)) {
+            fs.unlinkSync(tempArtworkPath);
+        }
+        if (fs.existsSync(tempOutputPath)) {
+            fs.unlinkSync(tempOutputPath);
+        }
+    }
+}
+
 // Export the main function as default
-export default generateProductMockup;
+export default generateMockupFromImage;
 
 // Export other useful functions
 export {
+    generateProductMockup,
     listAvailableProducts,
     checkProductStatus,
     getNextOutputFileForProduct
