@@ -24,21 +24,21 @@ async function tileArtwork(params) {
   console.log(`Tiling artwork ${artworkWidth}x${artworkHeight} to cover mask ${maskWidth}x${maskHeight}`);
   
   // Calculate optimal tile size based on mask dimensions
-  // We want the pattern to be visible but not too small or too large
-  const minTileSize = Math.min(maskWidth, maskHeight) / 6; // Minimum 1/6 of smallest dimension (was 1/8)
-  const maxTileSize = Math.min(maskWidth, maskHeight) / 1.5; // Maximum 2/3 of smallest dimension (was 1/2)
+  // Increased tile sizes for better visibility and coverage
+  const minTileSize = Math.min(maskWidth, maskHeight) / 3; // Increased from 1/6 to 1/3 of smallest dimension
+  const maxTileSize = Math.min(maskWidth, maskHeight) / 1.2; // Increased from 1/1.5 to 1/1.2 of smallest dimension
   
   // Calculate scale factor to fit artwork within optimal tile size range
   const artworkAspectRatio = artworkWidth / artworkHeight;
   let tileWidth, tileHeight;
   
   if (artworkAspectRatio > 1) {
-    // Landscape artwork - use 1/2 of mask width instead of 1/4 for bigger tiles
-    tileWidth = Math.min(maxTileSize, Math.max(minTileSize, maskWidth / 2));
+    // Landscape artwork - use 2/3 of mask width for much bigger tiles
+    tileWidth = Math.min(maxTileSize, Math.max(minTileSize, maskWidth * 0.67));
     tileHeight = tileWidth / artworkAspectRatio;
   } else {
-    // Portrait or square artwork - use 1/2 of mask height instead of 1/4 for bigger tiles
-    tileHeight = Math.min(maxTileSize, Math.max(minTileSize, maskHeight / 2));
+    // Portrait or square artwork - use 2/3 of mask height for much bigger tiles
+    tileHeight = Math.min(maxTileSize, Math.max(minTileSize, maskHeight * 0.67));
     tileWidth = tileHeight * artworkAspectRatio;
   }
   

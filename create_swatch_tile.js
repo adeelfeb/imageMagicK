@@ -22,7 +22,7 @@ if (files.length === 0) {
 console.log(`🖼️ Found ${files.length} swatch images, creating tiled image...`);
 
 const gridSize = Math.ceil(Math.sqrt(files.length));
-const tileSize = 300;
+const tileSize = 450; // Increased from 300 to 450 for larger tiles
 
 const canvasWidth = gridSize * tileSize;
 const canvasHeight = gridSize * tileSize;
