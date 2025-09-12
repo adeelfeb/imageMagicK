@@ -9,7 +9,7 @@ async function addBorder(params) {
 }
 
 async function tileArtwork(params) {
-  const { artwork, mask, out } = params;
+  const { artwork, mask, out, customTileSize = null } = params;
   
   // Get mask dimensions to determine how many tiles we need
   const getMaskDimensions = `identify -format "%wx%h" ${mask}`;
@@ -23,32 +23,40 @@ async function tileArtwork(params) {
   
   console.log(`Tiling artwork ${artworkWidth}x${artworkHeight} to cover mask ${maskWidth}x${maskHeight}`);
   
-  // Calculate optimal tile size based on mask dimensions
-  // Increased tile sizes for better visibility and coverage
-  const minTileSize = Math.min(maskWidth, maskHeight) / 3; // Increased from 1/6 to 1/3 of smallest dimension
-  const maxTileSize = Math.min(maskWidth, maskHeight) / 1.2; // Increased from 1/1.5 to 1/1.2 of smallest dimension
-  
-  // Calculate scale factor to fit artwork within optimal tile size range
-  const artworkAspectRatio = artworkWidth / artworkHeight;
   let tileWidth, tileHeight;
   
-  if (artworkAspectRatio > 1) {
-    // Landscape artwork - use 2/3 of mask width for much bigger tiles
-    tileWidth = Math.min(maxTileSize, Math.max(minTileSize, maskWidth * 0.67));
-    tileHeight = tileWidth / artworkAspectRatio;
+  if (customTileSize) {
+    // Use custom tile size (for non-tiled mode where we want single tile = mask area)
+    tileWidth = customTileSize.width;
+    tileHeight = customTileSize.height;
+    console.log(`Using custom tile size: ${Math.round(tileWidth)}x${Math.round(tileHeight)}`);
   } else {
-    // Portrait or square artwork - use 2/3 of mask height for much bigger tiles
-    tileHeight = Math.min(maxTileSize, Math.max(minTileSize, maskHeight * 0.67));
-    tileWidth = tileHeight * artworkAspectRatio;
+    // Calculate optimal tile size based on mask dimensions (original behavior for tiled mode)
+    // Increased tile sizes for better visibility and coverage
+    const minTileSize = Math.min(maskWidth, maskHeight) / 3; // Increased from 1/6 to 1/3 of smallest dimension
+    const maxTileSize = Math.min(maskWidth, maskHeight) / 1.2; // Increased from 1/1.5 to 1/1.2 of smallest dimension
+    
+    // Calculate scale factor to fit artwork within optimal tile size range
+    const artworkAspectRatio = artworkWidth / artworkHeight;
+    
+    if (artworkAspectRatio > 1) {
+      // Landscape artwork - use 2/3 of mask width for much bigger tiles
+      tileWidth = Math.min(maxTileSize, Math.max(minTileSize, maskWidth * 0.67));
+      tileHeight = tileWidth / artworkAspectRatio;
+    } else {
+      // Portrait or square artwork - use 2/3 of mask height for much bigger tiles
+      tileHeight = Math.min(maxTileSize, Math.max(minTileSize, maskHeight * 0.67));
+      tileWidth = tileHeight * artworkAspectRatio;
+    }
+    
+    // Ensure tile dimensions are reasonable
+    tileWidth = Math.max(50, Math.min(tileWidth, maskWidth));
+    tileHeight = Math.max(50, Math.min(tileHeight, maskHeight));
+    
+    console.log(`Optimal tile size: ${Math.round(tileWidth)}x${Math.round(tileHeight)}`);
   }
   
-  // Ensure tile dimensions are reasonable
-  tileWidth = Math.max(50, Math.min(tileWidth, maskWidth));
-  tileHeight = Math.max(50, Math.min(tileHeight, maskHeight));
-  
-  console.log(`Optimal tile size: ${Math.round(tileWidth)}x${Math.round(tileHeight)}`);
-  
-  // First, scale the artwork to the optimal tile size
+  // First, scale the artwork to the tile size
   const tempScaledArtwork = path.join(os.tmpdir(), `scaled_${Math.random().toString(36).substring(7)}.jpg`);
   const scaleCmd = `convert ${artwork} -resize ${Math.round(tileWidth)}x${Math.round(tileHeight)}! ${tempScaledArtwork}`;
   console.log(`Scaling artwork: ${scaleCmd}`);
@@ -272,20 +280,14 @@ async function perspectiveTransform(params) {
     console.log(`Scale factors: scaleX=${scaleX}, scaleY=${scaleY}`);
     console.log(`Perspective offset: ${perspectiveOffset}`);
     
-    // Expand the destination area slightly to ensure complete coverage
-    const expansionFactor = 1.1; // 10% expansion
-    const expandedOffsetX = Math.max(0, maskArea.offsetX - (maskArea.width * 0.05));
-    const expandedOffsetY = Math.max(0, maskArea.offsetY - (maskArea.height * 0.05));
-    const expandedWidth = Math.min(templateWidth, (maskArea.width + maskArea.width * 0.1));
-    const expandedHeight = Math.min(templateHeight, (maskArea.height + maskArea.height * 0.1));
-    
-    console.log(`Expanded area: ${expandedWidth}x${expandedHeight} at (${expandedOffsetX}, ${expandedOffsetY})`);
+    // Use exact mask area for precise positioning
+    console.log(`Using exact mask area: ${maskArea.width}x${maskArea.height} at (${maskArea.offsetX}, ${maskArea.offsetY})`);
     
     const dstCoords = [
-      expandedOffsetX * scaleX, expandedOffsetY * scaleY,                                    // top-left
-      (expandedOffsetX + expandedWidth) * scaleX, expandedOffsetY * scaleY,                   // top-right  
-      (expandedOffsetX + perspectiveOffset) * scaleX, (expandedOffsetY + expandedHeight) * scaleY,     // bottom-left (with perspective)
-      (expandedOffsetX + expandedWidth - perspectiveOffset) * scaleX, (expandedOffsetY + expandedHeight) * scaleY  // bottom-right (with perspective)
+      maskArea.offsetX * scaleX, maskArea.offsetY * scaleY,                                    // top-left
+      (maskArea.offsetX + maskArea.width) * scaleX, maskArea.offsetY * scaleY,                   // top-right  
+      (maskArea.offsetX + perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY,     // bottom-left (with perspective)
+      (maskArea.offsetX + maskArea.width - perspectiveOffset) * scaleX, (maskArea.offsetY + maskArea.height) * scaleY  // bottom-right (with perspective)
     ];
     
     console.log('Destination coordinates:', dstCoords);
@@ -325,9 +327,35 @@ async function adjustColors(params) {
 }
 
 async function composeArtwork(params) {
-  const { template, artwork, mask, out, mode = 'over' } = params;
-  const compose = `convert ${template} ${artwork} ${mask} -compose ${mode} -composite ${out}`;
-  await execShellCommand(compose);
+  const { template, artwork, mask, out, mode = 'over', useTiling = true } = params;
+  
+  if (useTiling) {
+    // For tiled images, use the standard composition
+    const compose = `convert ${template} ${artwork} ${mask} -compose ${mode} -composite ${out}`;
+    await execShellCommand(compose);
+  } else {
+    // For non-tiled images, use a more precise composition method
+    // First, apply the mask to the artwork to create a properly masked overlay
+    const tmpMasked = path.join(os.tmpdir(), `masked_${Math.random().toString(36).substring(7)}.png`);
+    
+    try {
+      // Apply mask to artwork using CopyOpacity to create proper transparency
+      const maskArtwork = `convert ${artwork} ${mask} -alpha Off -compose CopyOpacity -composite ${tmpMasked}`;
+      console.log('Masking artwork command:', maskArtwork);
+      await execShellCommand(maskArtwork);
+      
+      // Composite the masked artwork onto the template
+      const compose = `convert ${template} ${tmpMasked} -compose ${mode} -composite ${out}`;
+      console.log('Composing masked artwork command:', compose);
+      await execShellCommand(compose);
+      
+    } finally {
+      // Clean up temporary masked file
+      if (fs.existsSync(tmpMasked)) {
+        fs.unlinkSync(tmpMasked);
+      }
+    }
+  }
 }
 
 async function generateMockup(params) {
@@ -336,46 +364,39 @@ async function generateMockup(params) {
   const tmp2 = path.join(os.tmpdir(), `${Math.random().toString(36).substring(7)}.mpc`);
   
   
+  // Unified approach: both tiled and non-tiled use the same tiling process
   if (useTiling) {
-    // First tile the artwork to cover the mask area
+    // Standard tiled mode: use optimal tile size for multiple tiles
+    console.log('=== TILED MODE ===');
     await tileArtwork({ artwork, mask, out: tmp });
     await addBorder({ artwork: tmp, out: tmp2 });
     await perspectiveTransform({ template, artwork: tmp2, mask, out: tmp2, useOriginalCoords, isTiled: true });
     fs.unlinkSync(tmp);
   } else {
-    // For non-tiled images, shrink artwork to fit mask area and use same mapping as tiled
-    console.log('=== NON-TILED PATH ===');
+    // Non-tiled mode: use single tile with mask area dimensions
+    console.log('=== NON-TILED MODE (Single Tile) ===');
     console.log('Original artwork path:', artwork);
     
     // Get the actual mask area dimensions (not the full mask image)
     const maskArea = await analyzeMaskArea(mask);
     console.log('Detected mask area:', maskArea);
     
-    console.log(`Resizing artwork to OVERFILL mask area: ${maskArea.width}x${maskArea.height}`);
+    // Use much larger tile dimensions than mask area for better coverage
+    const scaleFactor = 2.0; // 2x larger than mask area
+    const customTileSize = {
+      width: Math.ceil(maskArea.width * scaleFactor),
+      height: Math.ceil(maskArea.height * scaleFactor)
+    };
     
-    // Scale artwork to be LARGER than mask area to ensure complete coverage
-    // Add 20% extra size to ensure no gaps, then crop to exact dimensions
-    const extraSize = 1.2; // 20% larger
-    const oversizedWidth = Math.ceil(maskArea.width * extraSize);
-    const oversizedHeight = Math.ceil(maskArea.height * extraSize);
+    console.log(`Using single tile with increased dimensions: ${customTileSize.width}x${customTileSize.height} (${scaleFactor}x mask area)`);
     
-    console.log(`Oversized dimensions: ${oversizedWidth}x${oversizedHeight}`);
-    
-    const resizeCmd = `convert ${artwork} -resize ${oversizedWidth}x${oversizedHeight}^ -background transparent -gravity center -extent ${maskArea.width}x${maskArea.height} ${tmp}`;
-    console.log('Resize command:', resizeCmd);
-    await execShellCommand(resizeCmd);
-    
-    // Check if resize worked
-    const checkResize = `identify -format "%wx%h" ${tmp}`;
-    const resizedDimensions = execSync(checkResize, { encoding: 'utf8' }).trim();
-    console.log('Resized artwork dimensions:', resizedDimensions);
-    
+    // Tile with custom size (this will create a single tile that matches mask area)
+    await tileArtwork({ artwork, mask, out: tmp, customTileSize });
     await addBorder({ artwork: tmp, out: tmp2 });
-    console.log('Added border to artwork');
     
-    // Use the same perspective transform as tiled images but with isTiled=false
-    await perspectiveTransform({ template, artwork: tmp2, mask, out: tmp2, useOriginalCoords, isTiled: false });
-    console.log('Applied perspective transform for non-tiled image');
+    // Use the same perspective transform as tiled images
+    await perspectiveTransform({ template, artwork: tmp2, mask, out: tmp2, useOriginalCoords, isTiled: true });
+    console.log('Applied perspective transform for non-tiled image (single tile mode)');
     
     fs.unlinkSync(tmp);
   }
@@ -401,8 +422,8 @@ async function generateMockup(params) {
   console.log('Mask:', mask);
   console.log('Output:', out);
   
-  // Use the same composition method for both tiled and non-tiled
-  await composeArtwork({ template, artwork: tmp2, mask, out });
+  // Use the standard composition method for both tiled and non-tiled (unified approach)
+  await composeArtwork({ template, artwork: tmp2, mask, out, useTiling: true });
   console.log('Composed artwork with template');
   
   fs.unlinkSync(tmp2);
