@@ -43,6 +43,99 @@ const upload = multer({
     }
 });
 
+// Custom error handler for multer errors
+const handleMulterError = (err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        switch (err.code) {
+            case 'LIMIT_FILE_COUNT':
+                return res.status(400).json({
+                    success: false,
+                    error: 'Too many files',
+                    message: 'Please upload only one image file at a time',
+                    code: 'LIMIT_FILE_COUNT',
+                    suggestion: 'Upload one image file using the "artwork" field'
+                });
+            case 'LIMIT_FILE_SIZE':
+                return res.status(400).json({
+                    success: false,
+                    error: 'File too large',
+                    message: 'File size exceeds the 50MB limit',
+                    code: 'LIMIT_FILE_SIZE',
+                    suggestion: 'Please compress your image or use a smaller file'
+                });
+            case 'LIMIT_UNEXPECTED_FILE':
+                return res.status(400).json({
+                    success: false,
+                    error: 'Unexpected file field',
+                    message: 'Please use the "artwork" field name for file uploads',
+                    code: 'LIMIT_UNEXPECTED_FILE',
+                    suggestion: 'Ensure your form uses the field name "artwork"'
+                });
+            case 'LIMIT_PART_COUNT':
+                return res.status(400).json({
+                    success: false,
+                    error: 'Too many parts',
+                    message: 'Too many parts in the multipart form',
+                    code: 'LIMIT_PART_COUNT',
+                    suggestion: 'Simplify your form data'
+                });
+            case 'LIMIT_FIELD_KEY':
+                return res.status(400).json({
+                    success: false,
+                    error: 'Field name too long',
+                    message: 'Field name exceeds the maximum length',
+                    code: 'LIMIT_FIELD_KEY',
+                    suggestion: 'Use shorter field names'
+                });
+            case 'LIMIT_FIELD_VALUE':
+                return res.status(400).json({
+                    success: false,
+                    error: 'Field value too long',
+                    message: 'Field value exceeds the maximum length',
+                    code: 'LIMIT_FIELD_VALUE',
+                    suggestion: 'Reduce the size of your field values'
+                });
+            case 'LIMIT_FIELD_COUNT':
+                return res.status(400).json({
+                    success: false,
+                    error: 'Too many fields',
+                    message: 'Too many fields in the form',
+                    code: 'LIMIT_FIELD_COUNT',
+                    suggestion: 'Reduce the number of form fields'
+                });
+            default:
+                return res.status(400).json({
+                    success: false,
+                    error: 'File upload error',
+                    message: err.message,
+                    code: err.code
+                });
+        }
+    } else if (err.message === 'Only image files (JPEG, PNG, GIF, BMP, WebP) are allowed') {
+        return res.status(400).json({
+            success: false,
+            error: 'Invalid file type',
+            message: 'Only image files (JPEG, PNG, GIF, BMP, WebP) are allowed',
+            suggestion: 'Please upload a valid image file'
+        });
+    }
+    
+    // Pass other errors to the next error handler
+    next(err);
+};
+
+// Wrapper function to handle multer errors properly
+const handleMulterUpload = (uploadMiddleware) => {
+    return (req, res, next) => {
+        uploadMiddleware(req, res, (err) => {
+            if (err) {
+                return handleMulterError(err, req, res, next);
+            }
+            next();
+        });
+    };
+};
+
 // Middleware to validate product parameter
 const validateProduct = (req, res, next) => {
     const { product } = req.params;
@@ -120,13 +213,13 @@ router.get('/products/:product/status', validateProduct, mockupController.getPro
  * @route POST /api/mockup/generate/:product
  * @desc Generate mockup for specific product
  */
-router.post('/generate/:product', validateProduct, upload.single('artwork'), mockupController.generateMockup);
+router.post('/generate/:product', validateProduct, handleMulterUpload(upload.single('artwork')), mockupController.generateMockup);
 
 /**
  * @route POST /api/mockup/generate
  * @desc Generate mockups for all available products
  */
-router.post('/generate', upload.single('artwork'), mockupController.generateAllMockups);
+router.post('/generate', handleMulterUpload(upload.single('artwork')), mockupController.generateAllMockups);
 
 /**
  * @route POST /api/mockup/generate-base64/:product
