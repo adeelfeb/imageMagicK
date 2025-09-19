@@ -113,11 +113,14 @@ export const generateMockup = async (req, res) => {
             'Content-Disposition': `inline; filename="${product}_mockup.jpg"`,
             'X-Product': product,
             'X-Size': mockupBuffer.length.toString(),
-            'X-Options': JSON.stringify({ useDynamic, useTiling })
+            'X-Options': JSON.stringify({ useDynamic, useTiling }),
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
         });
         
         // Send the image buffer directly
-        res.send(mockupBuffer);
+        res.end(mockupBuffer);
         
     } catch (error) {
         console.error('Error generating mockup:', error);
@@ -286,11 +289,14 @@ export const generateMockupFromBase64 = async (req, res) => {
             'Content-Disposition': `inline; filename="${product}_mockup.jpg"`,
             'X-Product': product,
             'X-Size': mockupBuffer.length.toString(),
-            'X-Options': JSON.stringify({ useDynamic, useTiling })
+            'X-Options': JSON.stringify({ useDynamic, useTiling }),
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
         });
         
         // Send the image buffer directly
-        res.send(mockupBuffer);
+        res.end(mockupBuffer);
         
     } catch (error) {
         console.error('Error generating mockup from base64:', error);

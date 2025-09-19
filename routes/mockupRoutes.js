@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { validateProductName, getProductStatus } from '../utils/setup.js';
 import { listAvailableProducts } from '../src/create_mockup.js';
@@ -189,6 +190,8 @@ router.get('/docs', (req, res) => {
             'POST /generate-base64': 'Generate mockup from base64 for all products',
             'POST /clear-temp': 'Clear all temporary files',
             'GET /temp-status': 'Get temporary files status',
+            'GET /test-image/:product': 'Test endpoint to return existing mockup image',
+            'GET /test-image-base64/:product': 'Test endpoint to return existing mockup as base64 JSON',
             'GET /health': 'Health check',
             'GET /docs': 'This documentation'
         },
@@ -197,7 +200,9 @@ router.get('/docs', (req, res) => {
             'Generate t-shirt mockup': 'POST /api/mockup/generate/tshirt',
             'Generate all mockups': 'POST /api/mockup/generate',
             'Clear temp files': 'POST /api/mockup/clear-temp',
-            'Check temp status': 'GET /api/mockup/temp-status'
+            'Check temp status': 'GET /api/mockup/temp-status',
+            'Test image (binary)': 'GET /api/mockup/test-image/tshirt',
+            'Test image (base64)': 'GET /api/mockup/test-image-base64/tshirt'
         },
         supportedFormats: ['JPEG', 'PNG', 'GIF', 'BMP', 'WebP'],
         maxFileSize: '50MB'
@@ -257,5 +262,91 @@ router.post('/clear-temp', mockupController.clearTempFiles);
  * @desc Get status of temporary files in temp directory
  */
 router.get('/temp-status', mockupController.getTempStatus);
+
+/**
+ * @route GET /api/mockup/test-image/:product
+ * @desc Test endpoint to return a mockup image directly
+ */
+router.get('/test-image/:product', (req, res) => {
+    try {
+        const { product } = req.params;
+        const imagePath = path.join(__dirname, '..', 'mockups', product, 'output.jpg');
+        
+        if (!fs.existsSync(imagePath)) {
+            return res.status(404).json({
+                success: false,
+                error: 'Image not found',
+                path: imagePath
+            });
+        }
+        
+        // Read the file as buffer
+        const imageBuffer = fs.readFileSync(imagePath);
+        
+        // Set proper headers for image response
+        res.set({
+            'Content-Type': 'image/jpeg',
+            'Content-Length': imageBuffer.length,
+            'Content-Disposition': `inline; filename="${product}_test.jpg"`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+        
+        // Send the buffer directly
+        res.end(imageBuffer);
+        
+    } catch (error) {
+        console.error('Test image error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/mockup/test-image-base64/:product
+ * @desc Test endpoint to return a mockup image as base64 JSON
+ */
+router.get('/test-image-base64/:product', (req, res) => {
+    try {
+        const { product } = req.params;
+        const imagePath = path.join(__dirname, '..', 'mockups', product, 'output.jpg');
+        
+        if (!fs.existsSync(imagePath)) {
+            return res.status(404).json({
+                success: false,
+                error: 'Image not found',
+                path: imagePath
+            });
+        }
+        
+        // Read the file as buffer
+        const imageBuffer = fs.readFileSync(imagePath);
+        
+        // Convert to base64
+        const base64Data = imageBuffer.toString('base64');
+        const dataUrl = `data:image/jpeg;base64,${base64Data}`;
+        
+        // Return as JSON
+        res.json({
+            success: true,
+            product: product,
+            image: {
+                data: dataUrl,
+                size: imageBuffer.length,
+                format: 'jpeg'
+            }
+        });
+        
+    } catch (error) {
+        console.error('Test image base64 error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
 
 export default router;
