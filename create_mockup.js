@@ -8,7 +8,7 @@ async function addBorder(params) {
   await execShellCommand(`convert ${artwork} -bordercolor transparent -border 1 ${out}`);
 }
 
-async function tileArtwork(params) {
+async function tileArtwork(params, productName = 'default') {
   const { artwork, mask, out, customTileSize = null } = params;
   
   // Get mask dimensions to determine how many tiles we need
@@ -57,7 +57,12 @@ async function tileArtwork(params) {
   }
   
   // First, scale the artwork to the tile size
-  const tempScaledArtwork = path.join(os.tmpdir(), `scaled_${Math.random().toString(36).substring(7)}.jpg`);
+  const tempDir = path.join(process.cwd(), 'temp', productName);
+  // Ensure temp directory exists
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+  const tempScaledArtwork = path.join(tempDir, `scaled_${Math.random().toString(36).substring(7)}.jpg`);
   const scaleCmd = `convert ${artwork} -resize ${Math.round(tileWidth)}x${Math.round(tileHeight)}! ${tempScaledArtwork}`;
   console.log(`Scaling artwork: ${scaleCmd}`);
   await execShellCommand(scaleCmd);
@@ -326,7 +331,7 @@ async function adjustColors(params) {
   await execShellCommand(adjust);
 }
 
-async function composeArtwork(params) {
+async function composeArtwork(params, productName = 'default') {
   const { template, artwork, mask, out, mode = 'over', useTiling = true } = params;
   
   if (useTiling) {
@@ -336,7 +341,12 @@ async function composeArtwork(params) {
   } else {
     // For non-tiled images, use a more precise composition method
     // First, apply the mask to the artwork to create a properly masked overlay
-    const tmpMasked = path.join(os.tmpdir(), `masked_${Math.random().toString(36).substring(7)}.png`);
+    const tempDir = path.join(process.cwd(), 'temp', productName);
+    // Ensure temp directory exists
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    const tmpMasked = path.join(tempDir, `masked_${Math.random().toString(36).substring(7)}.png`);
     
     try {
       // Apply mask to artwork using CopyOpacity to create proper transparency
@@ -358,17 +368,22 @@ async function composeArtwork(params) {
   }
 }
 
-async function generateMockup(params) {
+async function generateMockup(params, productName = 'default') {
   const { artwork, template, displacementMap, lightingMap, adjustmentMap, mask, out, useOriginalCoords = true, useTiling = true } = params;
-  const tmp = path.join(os.tmpdir(), `${Math.random().toString(36).substring(7)}.mpc`);
-  const tmp2 = path.join(os.tmpdir(), `${Math.random().toString(36).substring(7)}.mpc`);
+  const tempDir = path.join(process.cwd(), 'temp', productName);
+  // Ensure temp directory exists
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+  const tmp = path.join(tempDir, `${Math.random().toString(36).substring(7)}.mpc`);
+  const tmp2 = path.join(tempDir, `${Math.random().toString(36).substring(7)}.mpc`);
   
   
   // Unified approach: both tiled and non-tiled use the same tiling process
   if (useTiling) {
     // Standard tiled mode: use optimal tile size for multiple tiles
     console.log('=== TILED MODE ===');
-    await tileArtwork({ artwork, mask, out: tmp });
+    await tileArtwork({ artwork, mask, out: tmp }, productName);
     await addBorder({ artwork: tmp, out: tmp2 });
     await perspectiveTransform({ template, artwork: tmp2, mask, out: tmp2, useOriginalCoords, isTiled: true });
     fs.unlinkSync(tmp);
@@ -391,7 +406,7 @@ async function generateMockup(params) {
     console.log(`Using single tile with increased dimensions: ${customTileSize.width}x${customTileSize.height} (${scaleFactor}x mask area)`);
     
     // Tile with custom size (this will create a single tile that matches mask area)
-    await tileArtwork({ artwork, mask, out: tmp, customTileSize });
+    await tileArtwork({ artwork, mask, out: tmp, customTileSize }, productName);
     await addBorder({ artwork: tmp, out: tmp2 });
     
     // Use the same perspective transform as tiled images
@@ -423,11 +438,11 @@ async function generateMockup(params) {
   console.log('Output:', out);
   
   // Use the standard composition method for both tiled and non-tiled (unified approach)
-  await composeArtwork({ template, artwork: tmp2, mask, out, useTiling: true });
+  await composeArtwork({ template, artwork: tmp2, mask, out, useTiling: true }, productName);
   console.log('Composed artwork with template');
   
-  fs.unlinkSync(tmp2);
-  console.log('Cleaned up temporary files');
+  // fs.unlinkSync(tmp2);  // Commented out to preserve pattern mask image
+  console.log('Temporary files preserved (cleanup disabled)');
 }
 
 function execShellCommand(command) {
@@ -538,7 +553,7 @@ async function generateProductMockup(productName, artworkFile, options = {}) {
     console.log(`Generating mockup for ${productName} with artwork ${artworkFile}`);
     console.log(`Output: ${outputFile}`);
     
-    await generateMockup(mockupParams);
+    await generateMockup(mockupParams, productName);
     return outputFile;
 }
 
@@ -660,9 +675,14 @@ async function generateMockupFromImage(imageInput, productName, options = {}) {
         throw new Error(`Adjustment map not found: ${adjustmentPath}`);
     }
     
-    // Create temporary files for processing
-    const tempArtworkPath = path.join(os.tmpdir(), `artwork_${Math.random().toString(36).substring(7)}.jpg`);
-    const tempOutputPath = path.join(os.tmpdir(), `output_${Math.random().toString(36).substring(7)}.jpg`);
+    // Create temporary files for processing in product-specific temp directory
+    const tempDir = path.join(process.cwd(), 'temp', productName);
+    // Ensure temp directory exists
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    const tempArtworkPath = path.join(tempDir, `artwork_${Math.random().toString(36).substring(7)}.jpg`);
+    const tempOutputPath = path.join(tempDir, `output_${Math.random().toString(36).substring(7)}.jpg`);
     
     try {
         // Handle different input types
@@ -699,7 +719,7 @@ async function generateMockupFromImage(imageInput, productName, options = {}) {
         
         console.log(`Generating mockup for ${productName} with provided artwork`);
         
-        await generateMockup(mockupParams);
+        await generateMockup(mockupParams, productName);
         
         // Read the generated mockup as buffer
         const mockupBuffer = fs.readFileSync(tempOutputPath);
@@ -707,13 +727,14 @@ async function generateMockupFromImage(imageInput, productName, options = {}) {
         return mockupBuffer;
         
     } finally {
-        // Clean up temporary files
-        if (fs.existsSync(tempArtworkPath)) {
-            fs.unlinkSync(tempArtworkPath);
-        }
-        if (fs.existsSync(tempOutputPath)) {
-            fs.unlinkSync(tempOutputPath);
-        }
+        // Clean up temporary files - DISABLED to preserve files
+        // if (fs.existsSync(tempArtworkPath)) {
+        //     fs.unlinkSync(tempArtworkPath);
+        // }
+        // if (fs.existsSync(tempOutputPath)) {
+        //     fs.unlinkSync(tempOutputPath);
+        // }
+        console.log('Temporary files preserved (cleanup disabled)');
     }
 }
 
