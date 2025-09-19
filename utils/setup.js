@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { listAvailableProducts, checkProductStatus } from '../create_mockup.js';
+import { listAvailableProducts, checkProductStatus } from '../src/create_mockup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

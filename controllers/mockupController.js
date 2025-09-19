@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import generateMockupFromImage, { listAvailableProducts, checkProductStatus } from '../create_mockup.js';
-import { processArtworkForAllProducts, processArtworkForProduct } from '../mockup_processor.js';
+import generateMockupFromImage, { listAvailableProducts, checkProductStatus } from '../src/create_mockup.js';
+import { processArtworkForAllProducts, processArtworkForProduct } from '../src/mockup_processor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -433,6 +433,134 @@ export const healthCheck = async (req, res) => {
             success: false,
             status: 'unhealthy',
             error: error.message
+        });
+    }
+};
+
+/**
+ * Clear temporary files from temp directory
+ * @route POST /api/mockup/clear-temp
+ */
+export const clearTempFiles = async (req, res) => {
+    try {
+        const tempDir = path.join(process.cwd(), 'temp');
+        
+        if (!fs.existsSync(tempDir)) {
+            return res.json({
+                success: true,
+                message: 'Temp directory does not exist',
+                clearedFiles: 0,
+                clearedDirectories: []
+            });
+        }
+        
+        let totalClearedFiles = 0;
+        const clearedDirectories = [];
+        
+        // Get all subdirectories in temp folder
+        const tempSubdirs = fs.readdirSync(tempDir, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name);
+        
+        for (const subdir of tempSubdirs) {
+            const subdirPath = path.join(tempDir, subdir);
+            const files = fs.readdirSync(subdirPath);
+            
+            if (files.length > 0) {
+                // Delete all files in the subdirectory
+                for (const file of files) {
+                    const filePath = path.join(subdirPath, file);
+                    try {
+                        fs.unlinkSync(filePath);
+                        totalClearedFiles++;
+                    } catch (error) {
+                        console.warn(`Failed to delete file ${filePath}:`, error.message);
+                    }
+                }
+                
+                clearedDirectories.push({
+                    directory: subdir,
+                    filesCleared: files.length
+                });
+            }
+        }
+        
+        console.log(`🧹 Cleared ${totalClearedFiles} temporary files from ${clearedDirectories.length} directories`);
+        
+        res.json({
+            success: true,
+            message: `Successfully cleared ${totalClearedFiles} temporary files`,
+            clearedFiles: totalClearedFiles,
+            clearedDirectories: clearedDirectories,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Error clearing temp files:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to clear temporary files',
+            message: error.message
+        });
+    }
+};
+
+/**
+ * Get temp directory status
+ * @route GET /api/mockup/temp-status
+ */
+export const getTempStatus = async (req, res) => {
+    try {
+        const tempDir = path.join(process.cwd(), 'temp');
+        
+        if (!fs.existsSync(tempDir)) {
+            return res.json({
+                success: true,
+                tempDirectoryExists: false,
+                totalFiles: 0,
+                directories: []
+            });
+        }
+        
+        const directories = [];
+        let totalFiles = 0;
+        
+        // Get all subdirectories in temp folder
+        const tempSubdirs = fs.readdirSync(tempDir, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name);
+        
+        for (const subdir of tempSubdirs) {
+            const subdirPath = path.join(tempDir, subdir);
+            const files = fs.readdirSync(subdirPath);
+            
+            directories.push({
+                name: subdir,
+                fileCount: files.length,
+                files: files.map(file => ({
+                    name: file,
+                    size: fs.statSync(path.join(subdirPath, file)).size,
+                    modified: fs.statSync(path.join(subdirPath, file)).mtime
+                }))
+            });
+            
+            totalFiles += files.length;
+        }
+        
+        res.json({
+            success: true,
+            tempDirectoryExists: true,
+            totalFiles: totalFiles,
+            directories: directories,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Error getting temp status:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get temp directory status',
+            message: error.message
         });
     }
 };

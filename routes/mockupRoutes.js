@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { validateProductName, getProductStatus } from '../utils/setup.js';
-import { listAvailableProducts } from '../create_mockup.js';
+import { listAvailableProducts } from '../src/create_mockup.js';
 import * as mockupController from '../controllers/mockupController.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -185,12 +185,19 @@ router.get('/docs', (req, res) => {
             'GET /products/:product/status': 'Get product status',
             'POST /generate/:product': 'Generate mockup for specific product',
             'POST /generate': 'Generate mockup for all products',
+            'POST /generate-base64/:product': 'Generate mockup from base64 for specific product',
+            'POST /generate-base64': 'Generate mockup from base64 for all products',
+            'POST /clear-temp': 'Clear all temporary files',
+            'GET /temp-status': 'Get temporary files status',
+            'GET /health': 'Health check',
             'GET /docs': 'This documentation'
         },
         examples: {
             'List products': 'GET /api/mockup/products',
             'Generate t-shirt mockup': 'POST /api/mockup/generate/tshirt',
-            'Generate all mockups': 'POST /api/mockup/generate'
+            'Generate all mockups': 'POST /api/mockup/generate',
+            'Clear temp files': 'POST /api/mockup/clear-temp',
+            'Check temp status': 'GET /api/mockup/temp-status'
         },
         supportedFormats: ['JPEG', 'PNG', 'GIF', 'BMP', 'WebP'],
         maxFileSize: '50MB'
@@ -238,5 +245,17 @@ router.post('/generate-base64', mockupController.generateAllMockupsFromBase64);
  * @desc Health check for mockup service
  */
 router.get('/health', mockupController.healthCheck);
+
+/**
+ * @route POST /api/mockup/clear-temp
+ * @desc Clear all temporary files from temp directory
+ */
+router.post('/clear-temp', mockupController.clearTempFiles);
+
+/**
+ * @route GET /api/mockup/temp-status
+ * @desc Get status of temporary files in temp directory
+ */
+router.get('/temp-status', mockupController.getTempStatus);
 
 export default router;
