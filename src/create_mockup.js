@@ -63,12 +63,12 @@ async function tileArtwork(params, productName = 'default') {
     fs.mkdirSync(tempDir, { recursive: true });
   }
   const tempScaledArtwork = path.join(tempDir, `scaled_${Math.random().toString(36).substring(7)}.jpg`);
-  const scaleCmd = `convert ${artwork} -resize ${Math.round(tileWidth)}x${Math.round(tileHeight)}! ${tempScaledArtwork}`;
+  const scaleCmd = `convert -limit area 256MB -limit memory 256MB ${artwork} -resize ${Math.round(tileWidth)}x${Math.round(tileHeight)}! ${tempScaledArtwork}`;
   console.log(`Scaling artwork: ${scaleCmd}`);
   await execShellCommand(scaleCmd);
   
   // Then tile the scaled artwork across the mask area
-  const tileCmd = `convert -size ${maskWidth}x${maskHeight} tile:${tempScaledArtwork} ${out}`;
+  const tileCmd = `convert -limit area 512MB -limit memory 512MB -size ${maskWidth}x${maskHeight} tile:${tempScaledArtwork} ${out}`;
   console.log(`Tiling scaled artwork: ${tileCmd}`);
   await execShellCommand(tileCmd);
   
@@ -303,7 +303,7 @@ async function perspectiveTransform(params) {
   
   console.log('Using coordinates:', coordinates);
   
-  const transform = `convert ${template} -alpha transparent \\( ${artwork} +distort perspective ${coordinates} \\) -background transparent -layers merge +repage ${out}`;
+  const transform = `convert -limit area 1024MB -limit memory 1024MB ${template} -alpha transparent \\( ${artwork} +distort perspective ${coordinates} \\) -background transparent -layers merge +repage ${out}`;
   await execShellCommand(transform);
 }
 
@@ -375,8 +375,8 @@ async function generateMockup(params, productName = 'default') {
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
-  const tmp = path.join(tempDir, `${Math.random().toString(36).substring(7)}.mpc`);
-  const tmp2 = path.join(tempDir, `${Math.random().toString(36).substring(7)}.mpc`);
+  const tmp = path.join(tempDir, `${Math.random().toString(36).substring(7)}.png`);
+  const tmp2 = path.join(tempDir, `${Math.random().toString(36).substring(7)}.png`);
   
   
   // Unified approach: both tiled and non-tiled use the same tiling process

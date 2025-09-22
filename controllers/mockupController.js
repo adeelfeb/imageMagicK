@@ -110,6 +110,9 @@ export const generateMockup = async (req, res) => {
         // Clean up uploaded file immediately
         fs.unlinkSync(req.file.path);
         
+        // Clear uploads directory (except .gitkeep) before responding
+        await clearUploadsDirectory();
+
         // Set response headers for image
         res.set({
             'Content-Type': 'image/jpeg',
@@ -208,6 +211,9 @@ export const generateAllMockups = async (req, res) => {
         // Clean up uploaded file
         fs.unlinkSync(req.file.path);
         
+        // Clear uploads directory (except .gitkeep) before responding
+        await clearUploadsDirectory();
+
         // Set response headers for JSON with base64 images
         res.set({
             'Content-Type': 'application/json',
@@ -375,6 +381,9 @@ export const generateAllMockupsFromBase64 = async (req, res) => {
             }
         }
         
+        // Clear uploads directory (except .gitkeep) before responding
+        await clearUploadsDirectory();
+
         // Set response headers for JSON with base64 images
         res.set({
             'Content-Type': 'application/json',
@@ -595,6 +604,28 @@ function getNextOutputFile(directory, prefix = 'output') {
     return path.join(directory, filename);
 }
 
+// Remove all files in uploads/ except .gitkeep
+async function clearUploadsDirectory() {
+    try {
+        const uploadsDir = path.join(process.cwd(), 'uploads');
+        if (!fs.existsSync(uploadsDir)) return;
+        const entries = fs.readdirSync(uploadsDir);
+        for (const entry of entries) {
+            if (entry === '.gitkeep') continue;
+            const filePath = path.join(uploadsDir, entry);
+            try {
+                if (fs.statSync(filePath).isFile()) {
+                    fs.unlinkSync(filePath);
+                }
+            } catch (e) {
+                // ignore individual file errors
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to clear uploads directory:', e.message);
+    }
+}
+
 /**
  * @desc Upload base images (template, mask) for a new product, generate maps, then apply provided pattern
  * @route POST /api/mockup/create-product-and-generate
@@ -608,6 +639,15 @@ function getNextOutputFile(directory, prefix = 'output') {
 export const uploadBaseImagesAndGenerate = async (req, res) => {
     try {
         const { foldername } = req.body || {};
+        let { useDynamic = false, useTiling = true } = req.body || {};
+
+        // Normalize boolean-like strings
+        if (typeof useTiling === 'string') {
+            useTiling = useTiling.toLowerCase() === 'true';
+        }
+        if (typeof useDynamic === 'string') {
+            useDynamic = useDynamic.toLowerCase() === 'true';
+        }
 
         // Validate foldername
         if (!foldername || typeof foldername !== 'string') {
@@ -626,78 +666,102 @@ export const uploadBaseImagesAndGenerate = async (req, res) => {
             });
         }
 
-        // Validate files
+        // Prepare directories & current status
+        const baseDir = path.join(process.cwd(), 'base_images', normalizedName);
+        const mapsDir = path.join(process.cwd(), 'maps', normalizedName);
+        const mockupsDir = path.join(process.cwd(), 'mockups', normalizedName);
+        fs.mkdirSync(baseDir, { recursive: true });
+        fs.mkdirSync(mockupsDir, { recursive: true });
+
+        const templateDest = path.join(baseDir, 'template.jpg');
+        const maskDest = path.join(baseDir, 'mask.png');
+        const displacementPath = path.join(mapsDir, 'displacement_map.png');
+        const lightingPath = path.join(mapsDir, 'lighting_map.png');
+        const adjustmentPath = path.join(mapsDir, 'adjustment_map.jpg');
+
+        const hasBaseImages = fs.existsSync(templateDest) && fs.existsSync(maskDest);
+        const hasMaps = fs.existsSync(displacementPath) && fs.existsSync(lightingPath) && fs.existsSync(adjustmentPath);
+
+        // Extract uploaded files
         const files = req.files || {};
         const templateFile = files['template']?.[0];
         const maskFile = files['mask']?.[0];
         const patternFile = files['pattern-image']?.[0];
 
-        if (!templateFile || !maskFile || !patternFile) {
+        // Always require pattern-image
+        if (!patternFile) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required files',
-                message: 'Upload template, mask, and pattern-image files'
+                error: 'Missing pattern-image',
+                message: 'Upload pattern-image file to generate mockup'
             });
         }
 
-        // Prepare directories
-        const baseDir = path.join(process.cwd(), 'base_images', normalizedName);
-        const mapsDir = path.join(process.cwd(), 'maps', normalizedName);
-        const mockupsDir = path.join(process.cwd(), 'mockups', normalizedName);
-        fs.mkdirSync(baseDir, { recursive: true });
-        fs.mkdirSync(mapsDir, { recursive: true });
-        fs.mkdirSync(mockupsDir, { recursive: true });
+        let skippedMapGeneration = false;
 
-        // Move/copy uploaded files into base_images/<foldername>
-        const templateDest = path.join(baseDir, 'template.jpg');
-        const maskDest = path.join(baseDir, 'mask.png');
-
-        // Overwrite if exist
-        fs.copyFileSync(templateFile.path, templateDest);
-        fs.copyFileSync(maskFile.path, maskDest);
-
-        // Run maps generation script for this product only
-        const scriptPath = path.join(process.cwd(), 'src', 'create_maps.sh');
-        const cmd = `bash ${scriptPath} ${normalizedName}`;
-        try {
-            const { stdout, stderr } = await execAsync(cmd, { cwd: process.cwd() });
-            if (stderr && stderr.trim().length > 0) {
-                console.warn('create_maps.sh warnings:', stderr);
+        if (hasBaseImages && hasMaps) {
+            // Skip base image copy and map generation
+            skippedMapGeneration = true;
+        } else {
+            // When base images or maps are missing, require template and mask uploads
+            if (!templateFile || !maskFile) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Missing required files',
+                    message: 'Upload template and mask when base images/maps do not exist for this product'
+                });
             }
-            console.log(stdout);
-        } catch (scriptError) {
-            console.error('Map generation failed:', scriptError);
-            return res.status(500).json({
-                success: false,
-                error: 'Map generation failed',
-                message: scriptError.message
-            });
+
+            // Ensure maps directory exists
+            fs.mkdirSync(mapsDir, { recursive: true });
+
+            // Copy uploaded base images
+            fs.copyFileSync(templateFile.path, templateDest);
+            fs.copyFileSync(maskFile.path, maskDest);
+
+            // Run maps generation script scoped to this product
+            const scriptPath = path.join(process.cwd(), 'src', 'create_maps.sh');
+            const cmd = `bash ${scriptPath} ${normalizedName}`;
+            try {
+                const { stdout, stderr } = await execAsync(cmd, { cwd: process.cwd() });
+                if (stderr && stderr.trim().length > 0) {
+                    console.warn('create_maps.sh warnings:', stderr);
+                }
+                console.log(stdout);
+            } catch (scriptError) {
+                console.error('Map generation failed:', scriptError);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Map generation failed',
+                    message: scriptError.message
+                });
+            }
+
+            // Ensure maps were created
+            if (!fs.existsSync(displacementPath) || !fs.existsSync(lightingPath) || !fs.existsSync(adjustmentPath)) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Required maps missing',
+                    message: 'Map generation did not produce all required files'
+                });
+            }
         }
 
-        // Ensure maps were created
-        const displacementPath = path.join(mapsDir, 'displacement_map.png');
-        const lightingPath = path.join(mapsDir, 'lighting_map.png');
-        const adjustmentPath = path.join(mapsDir, 'adjustment_map.jpg');
-        if (!fs.existsSync(displacementPath) || !fs.existsSync(lightingPath) || !fs.existsSync(adjustmentPath)) {
-            return res.status(500).json({
-                success: false,
-                error: 'Required maps missing',
-                message: 'Map generation did not produce all required files'
-            });
-        }
-
-        // Generate mockup using the provided pattern image for this new product
+        // Generate mockup using the provided pattern image for this product
         const mockupBuffer = await generateMockupFromImage(patternFile.path, normalizedName, {
-            useDynamic: false,
-            useTiling: true
+            useDynamic,
+            useTiling
         });
 
-        // Clean up uploaded temps
+        // Clean up uploaded temp files
         try {
             if (templateFile?.path && fs.existsSync(templateFile.path)) fs.unlinkSync(templateFile.path);
             if (maskFile?.path && fs.existsSync(maskFile.path)) fs.unlinkSync(maskFile.path);
             if (patternFile?.path && fs.existsSync(patternFile.path)) fs.unlinkSync(patternFile.path);
         } catch (_) {}
+
+        // Clear uploads directory (except .gitkeep) before returning
+        await clearUploadsDirectory();
 
         // Return image buffer
         res.set({
@@ -705,6 +769,8 @@ export const uploadBaseImagesAndGenerate = async (req, res) => {
             'Content-Length': mockupBuffer.length,
             'Content-Disposition': `inline; filename="${normalizedName}_mockup.jpg"`,
             'X-Product': normalizedName,
+            'X-Maps-Generated': skippedMapGeneration ? 'false' : 'true',
+            'X-Options': JSON.stringify({ useDynamic, useTiling }),
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
