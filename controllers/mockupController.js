@@ -5,6 +5,7 @@ import generateMockupFromImage, { listAvailableProducts, checkProductStatus } fr
 import { processArtworkForAllProducts, processArtworkForProduct } from '../src/mockup_processor.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import archiver from 'archiver';
 
 const execAsync = promisify(exec);
 
@@ -254,6 +255,73 @@ export const generateAllMockups = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to generate mockups',
+            message: error.message
+        });
+    }
+};
+
+/**
+ * @desc Generate mockups for all ready products and return as a ZIP
+ * @route POST /api/mockup/generate-zip
+ * Body: form-data with field `artwork` (File)
+ */
+export const generateAllMockupsZip = async (req, res) => {
+    try {
+        let { useDynamic = false, useTiling = true } = req.body || {};
+        if (typeof useTiling === 'string') useTiling = useTiling.toLowerCase() === 'true';
+        if (typeof useDynamic === 'string') useDynamic = useDynamic.toLowerCase() === 'true';
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No artwork file provided',
+                message: 'Please upload an image file using the "artwork" field'
+            });
+        }
+
+        const products = listAvailableProducts();
+        const readyProducts = products.filter(p => checkProductStatus(p).isReady);
+        if (readyProducts.length === 0) {
+            return res.status(400).json({ success: false, error: 'No ready products to generate' });
+        }
+
+        // Prepare ZIP stream
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', 'attachment; filename="mockups.zip"');
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        archive.on('error', (err) => { throw err; });
+        archive.pipe(res);
+
+        // Generate per-product mockups, append to ZIP
+        for (const product of readyProducts) {
+            try {
+                const buffer = await generateMockupFromImage(req.file.path, product, { useDynamic, useTiling });
+                archive.append(buffer, { name: `${product}.jpg` });
+            } catch (err) {
+                // Include a small text file describing the failure for this product
+                const msg = `Failed to generate ${product}: ${err.message}`;
+                archive.append(msg, { name: `${product}_ERROR.txt` });
+            }
+        }
+
+        // Finish ZIP
+        archive.finalize();
+
+        // Cleanup uploaded file and uploads directory
+        try {
+            if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        } catch (_) {}
+        await clearUploadsDirectory();
+
+    } catch (error) {
+        console.error('Error generating all mockups ZIP:', error);
+        // Cleanup uploaded file if exists
+        if (req.file && fs.existsSync(req.file.path)) {
+            try { fs.unlinkSync(req.file.path); } catch (_) {}
+        }
+        res.status(500).json({
+            success: false,
+            error: 'Failed to generate ZIP',
             message: error.message
         });
     }

@@ -234,6 +234,12 @@ router.post('/generate/:product', validateProduct, handleMulterUpload(upload.sin
 router.post('/generate', handleMulterUpload(upload.single('artwork')), mockupController.generateAllMockups);
 
 /**
+ * @route POST /api/mockup/generate-zip
+ * @desc Generate mockups for all ready products and return as ZIP
+ */
+router.post('/generate-zip', handleMulterUpload(upload.single('artwork')), mockupController.generateAllMockupsZip);
+
+/**
  * @route POST /api/mockup/create-product-and-generate
  * @desc Upload template, mask, and pattern-image, create folder and maps, then return mockup
  */

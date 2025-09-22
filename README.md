@@ -146,6 +146,17 @@ node create_mockup.js --product=mobile_cover --artwork=swatches/art2.jpg
 | **Mug** | Drinkware | 300x300px | ✅ Recommended |
 | **Hoodie** | Apparel designs | Any size | ✅ Recommended |
 
+  
+## **🖼️ Expected Output Previews**
+
+Below are sample mockups included in the repo under `DISPLAYREADME/` for quick visual reference.
+
+| Product | Preview |
+|---------|--------|
+| Curtain | ![Curtain](DISPLAYREADME/curtain.jpg) |
+| Mobile Cover | ![Mobile Cover](DISPLAYREADME/mobile_cover.jpg) |
+| Testing2 (Generated) | ![Testing2 Mockup](DISPLAYREADME/testing2_mockup.jpg) |
+| Testing2 (Source Artwork) | ![Testing2 Artwork](DISPLAYREADME/testing2.jpg) |
 
 
 ## **🔧 API Endpoints**
