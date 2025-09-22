@@ -15,10 +15,43 @@ Hey there! 👋 This is your one-stop solution for creating stunning product moc
 
 ### **Step 1: Install Dependencies**
 
+Use NVM for managing Node.js versions (recommended), then install ImageMagick:
+
 ```bash
+# Linux (Ubuntu/WSL2) — run these inside your Linux shell (e.g., Ubuntu on WSL2)
+
+# 1) System update
 sudo apt update && sudo apt upgrade -y
-sudo apt install nodejs npm imagemagick -y
+
+# 2) Install NVM (Node Version Manager)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+# 3) Load NVM into your current shell
+#    Choose the line that matches your shell; you can add it to your shell RC file.
+export NVM_DIR="$HOME/.nvm"
+# bash
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+# zsh
+# [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+
+# 4) Install and use the latest LTS Node.js
+nvm install --lts
+nvm use --lts
+
+# 5) Verify versions
+node -v
+npm -v
+
+# 6) Install ImageMagick
+sudo apt install -y imagemagick
 ```
+
+WSL2 Notes:
+- Open “Ubuntu” (or your chosen distro) and run all commands there, not in Windows PowerShell.
+- Your project path under WSL usually looks like `/home/<user>/mockup-main` (avoid working inside `/mnt/c/...` for better performance).
+- If you hit ImageMagick policy limits on very large images, consider reducing image sizes or adjusting `policy.xml` (advanced), or run with smaller `useTiling`/`useDynamic` settings.
 
 ### **Step 2: Setup Project**
 
@@ -113,62 +146,7 @@ node create_mockup.js --product=mobile_cover --artwork=swatches/art2.jpg
 | **Mug** | Drinkware | 300x300px | ✅ Recommended |
 | **Hoodie** | Apparel designs | Any size | ✅ Recommended |
 
-## **🎨 Example Results**
 
-Here are some real mockups generated with this tool:
-
-### **Curtain Mockups**
-
-
-
-![Curtain Example 2](mockups/tshirt/output1.jpg)
-*Curtain with floral design*
-
-![Curtain Example 3](mockups/tshirt/output2.jpg)
-*Curtain with abstract pattern*
-
-### **Mobile Cover Mockups**
-
-![Mobile Cover Example 1](mockups/mobile_cover/output15.jpg)
-*Mobile cover with tiled pattern*
-
-![Mobile Cover Example 2](mockups/mobile_cover/output16.jpg)
-*Mobile cover with single artwork*
-
-![Mobile Cover Example 3](mockups/mobile_cover/output17.jpg)
-*Mobile cover with different design*
-
-![Mobile Cover Example 4](mockups/mobile_cover/output21.jpg)
-*Mobile cover with geometric pattern*
-
-![Mobile Cover Example 5](mockups/mobile_cover/output22.jpg)
-*Mobile cover with artistic design*
-
-![Mobile Cover Example 6](mockups/mobile_cover/output23.jpg)
-*Mobile cover with modern pattern*
-
-![Mobile Cover Example 7](mockups/mobile_cover/output24.jpg)
-*Mobile cover with creative artwork*
-
-### **Curtain Mockups**
-
-![Curtain Example 1](mockups/curtain/output12.jpg)
-*Curtain with tiled pattern*
-
-![Curtain Example 2](mockups/curtain/output13.jpg)
-*Curtain with different artwork*
-
-![Curtain Example 3](mockups/curtain/output14.jpg)
-*Curtain with geometric design*
-
-![Curtain Example 4](mockups/curtain/output15.jpg)
-*Curtain with floral pattern*
-
-![Curtain Example 5](mockups/curtain/output16.jpg)
-*Curtain with abstract design*
-
-![Curtain Example 6](mockups/curtain/output17.jpg)
-*Curtain with modern pattern*
 
 ## **🔧 API Endpoints**
 
@@ -181,6 +159,56 @@ Here are some real mockups generated with this tool:
 - `POST /api/mockup/generate/:product` - Generate single product mockup
 - `POST /api/mockup/generate` - Generate all products
 - `POST /api/mockup/generate-base64/:product` - Generate from base64 image
+ - `POST /api/mockup/create-product-and-generate` - Upload template+mask once, auto-generate maps, then apply a pattern
+
+#### New: Create Product + Generate (Single-shot)
+
+Endpoint: `POST /api/mockup/create-product-and-generate`
+
+- Purpose: Create or reuse a product under `base_images/<foldername>`, generate maps (if not already present), and immediately return a mockup using your uploaded pattern image.
+- Body: multipart/form-data
+  - `foldername` (Text): product key, e.g. `custom_cover` (allowed: a–z, 0–9, `_`, `-`)
+  - `template` (File): template image → saved as `base_images/<foldername>/template.jpg`
+  - `mask` (File): mask image → saved as `base_images/<foldername>/mask.png`
+  - `pattern-image` (File): pattern/artwork used to render the mockup
+  - Optional flags (Text):
+    - `useTiling`: `true` | `false` (default: `true`)
+    - `useDynamic`: `true` | `false` (default: `false`)
+
+Behavior:
+- If `base_images/<foldername>` exists AND `maps/<foldername>` has all required maps, the endpoint skips re-copying base images and skips re-generating maps.
+- Always applies the provided `pattern-image` to produce and return the mockup.
+- Cleans `uploads/` after each request (preserves `.gitkeep`).
+
+Response:
+- Content-Type: `image/jpeg`
+- Headers:
+  - `X-Product`: `<foldername>`
+  - `X-Maps-Generated`: `true` if maps were created in this request, otherwise `false`
+  - `X-Options`: `{"useDynamic":boolean,"useTiling":boolean}`
+
+Postman (form-data):
+1. Method: POST
+2. URL: `http://localhost:5002/api/mockup/create-product-and-generate`
+3. Body → form-data:
+   - `foldername` → Text → `custom_cover`
+   - `useTiling` → Text → `false` (optional)
+   - `useDynamic` → Text → `true` (optional)
+   - `template` → File → select `template.jpg`
+   - `mask` → File → select `mask.png`
+   - `pattern-image` → File → select `pattern.jpg`
+
+curl:
+```bash
+curl -X POST http://localhost:5002/api/mockup/create-product-and-generate \
+  -F foldername=custom_cover \
+  -F useTiling=false \
+  -F useDynamic=true \
+  -F template=@/path/to/template.jpg \
+  -F mask=@/path/to/mask.png \
+  -F pattern-image=@/path/to/pattern.jpg \
+  --output custom_cover_mockup.jpg
+```
 
 ### **Response Types**
 
