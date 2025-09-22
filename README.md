@@ -39,7 +39,7 @@ npm install
 ### **Step 3: Generate Required Maps**
 
 ```bash
-./create_maps.sh
+bash ./src/create_maps.sh
 ```
 
 ### **Step 4: Start the API Server**

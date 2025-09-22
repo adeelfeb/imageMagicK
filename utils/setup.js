@@ -15,8 +15,7 @@ export async function validateEnvironment() {
     const requiredDirs = [
         'base_images',
         'maps',
-        'mockups',
-        'swatches'
+        'mockups'
     ];
     
     const missingDirs = [];
