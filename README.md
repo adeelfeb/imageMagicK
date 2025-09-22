@@ -24,7 +24,7 @@ sudo apt install nodejs npm imagemagick -y
 
 **For Local Environment (WSL2):**
 ```bash
-cd /home/anya/mockup/mockup
+cd /home/anya/mockup-main
 ```
 
 **For Online/Server Environment:**
