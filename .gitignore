@@ -206,18 +206,6 @@ tiled_images/
 *.cache
 mask_processed.png
 
-# Keep some sample mockups but ignore most
-mockups/*
-!mockups/curtain/output12.jpg
-!mockups/curtain/output13.jpg
-!mockups/curtain/output8.jpg
-!mockups/tshirt/output.jpg
-!mockups/tshirt/output1.jpg
-!mockups/tshirt/output2.jpg
-!mockups/mobile_cover/output15.jpg
-!mockups/mobile_cover/output16.jpg
-!mockups/mobile_cover/output17.jpg
-
 # OS generated files
 .DS_Store
 .DS_Store?
