@@ -28,7 +28,7 @@ const upload = multer({
     storage: storage,
     limits: {
         fileSize: 50 * 1024 * 1024, // 50MB limit
-        files: 1 // Only one file at a time
+        files: 10
     },
     fileFilter: (req, file, cb) => {
         // Check file type
@@ -232,6 +232,22 @@ router.post('/generate/:product', validateProduct, handleMulterUpload(upload.sin
  * @desc Generate mockups for all available products
  */
 router.post('/generate', handleMulterUpload(upload.single('artwork')), mockupController.generateAllMockups);
+
+/**
+ * @route POST /api/mockup/create-product-and-generate
+ * @desc Upload template, mask, and pattern-image, create folder and maps, then return mockup
+ */
+router.post(
+    '/create-product-and-generate',
+    handleMulterUpload(
+        upload.fields([
+            { name: 'template', maxCount: 1 },
+            { name: 'mask', maxCount: 1 },
+            { name: 'pattern-image', maxCount: 1 }
+        ])
+    ),
+    mockupController.uploadBaseImagesAndGenerate
+);
 
 /**
  * @route POST /api/mockup/generate-base64/:product

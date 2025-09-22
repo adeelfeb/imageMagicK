@@ -3,6 +3,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import generateMockupFromImage, { listAvailableProducts, checkProductStatus } from '../src/create_mockup.js';
 import { processArtworkForAllProducts, processArtworkForProduct } from '../src/mockup_processor.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -590,3 +594,129 @@ function getNextOutputFile(directory, prefix = 'output') {
     
     return path.join(directory, filename);
 }
+
+/**
+ * @desc Upload base images (template, mask) for a new product, generate maps, then apply provided pattern
+ * @route POST /api/mockup/create-product-and-generate
+ * Expected multipart fields:
+ *  - template: image file (will be saved as base_images/<foldername>/template.jpg)
+ *  - mask: image file (will be saved as base_images/<foldername>/mask.png)
+ *  - pattern-image: image file (used as artwork to generate mockup)
+ * Body JSON/fields:
+ *  - foldername: string (product name/folder under base_images)
+ */
+export const uploadBaseImagesAndGenerate = async (req, res) => {
+    try {
+        const { foldername } = req.body || {};
+
+        // Validate foldername
+        if (!foldername || typeof foldername !== 'string') {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid foldername',
+                message: 'Provide a non-empty foldername string in form-data/body'
+            });
+        }
+        const normalizedName = foldername.trim().toLowerCase();
+        if (!/^[a-z0-9_-]+$/.test(normalizedName)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid foldername format',
+                message: 'Use only lowercase letters, numbers, hyphens and underscores'
+            });
+        }
+
+        // Validate files
+        const files = req.files || {};
+        const templateFile = files['template']?.[0];
+        const maskFile = files['mask']?.[0];
+        const patternFile = files['pattern-image']?.[0];
+
+        if (!templateFile || !maskFile || !patternFile) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required files',
+                message: 'Upload template, mask, and pattern-image files'
+            });
+        }
+
+        // Prepare directories
+        const baseDir = path.join(process.cwd(), 'base_images', normalizedName);
+        const mapsDir = path.join(process.cwd(), 'maps', normalizedName);
+        const mockupsDir = path.join(process.cwd(), 'mockups', normalizedName);
+        fs.mkdirSync(baseDir, { recursive: true });
+        fs.mkdirSync(mapsDir, { recursive: true });
+        fs.mkdirSync(mockupsDir, { recursive: true });
+
+        // Move/copy uploaded files into base_images/<foldername>
+        const templateDest = path.join(baseDir, 'template.jpg');
+        const maskDest = path.join(baseDir, 'mask.png');
+
+        // Overwrite if exist
+        fs.copyFileSync(templateFile.path, templateDest);
+        fs.copyFileSync(maskFile.path, maskDest);
+
+        // Run maps generation script for this product only
+        const scriptPath = path.join(process.cwd(), 'src', 'create_maps.sh');
+        const cmd = `bash ${scriptPath} ${normalizedName}`;
+        try {
+            const { stdout, stderr } = await execAsync(cmd, { cwd: process.cwd() });
+            if (stderr && stderr.trim().length > 0) {
+                console.warn('create_maps.sh warnings:', stderr);
+            }
+            console.log(stdout);
+        } catch (scriptError) {
+            console.error('Map generation failed:', scriptError);
+            return res.status(500).json({
+                success: false,
+                error: 'Map generation failed',
+                message: scriptError.message
+            });
+        }
+
+        // Ensure maps were created
+        const displacementPath = path.join(mapsDir, 'displacement_map.png');
+        const lightingPath = path.join(mapsDir, 'lighting_map.png');
+        const adjustmentPath = path.join(mapsDir, 'adjustment_map.jpg');
+        if (!fs.existsSync(displacementPath) || !fs.existsSync(lightingPath) || !fs.existsSync(adjustmentPath)) {
+            return res.status(500).json({
+                success: false,
+                error: 'Required maps missing',
+                message: 'Map generation did not produce all required files'
+            });
+        }
+
+        // Generate mockup using the provided pattern image for this new product
+        const mockupBuffer = await generateMockupFromImage(patternFile.path, normalizedName, {
+            useDynamic: false,
+            useTiling: true
+        });
+
+        // Clean up uploaded temps
+        try {
+            if (templateFile?.path && fs.existsSync(templateFile.path)) fs.unlinkSync(templateFile.path);
+            if (maskFile?.path && fs.existsSync(maskFile.path)) fs.unlinkSync(maskFile.path);
+            if (patternFile?.path && fs.existsSync(patternFile.path)) fs.unlinkSync(patternFile.path);
+        } catch (_) {}
+
+        // Return image buffer
+        res.set({
+            'Content-Type': 'image/jpeg',
+            'Content-Length': mockupBuffer.length,
+            'Content-Disposition': `inline; filename="${normalizedName}_mockup.jpg"`,
+            'X-Product': normalizedName,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+        res.end(mockupBuffer);
+
+    } catch (error) {
+        console.error('Error in uploadBaseImagesAndGenerate:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create product and generate mockup',
+            message: error.message
+        });
+    }
+};
